@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Thorun</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;700&display=swap">
+  <link rel="stylesheet" href="css/style.css">
+  <!-- three.js는 js/vendor에 포함되어 있어서 외부 CDN 없이 GitHub Pages에서 그대로 동작한다. -->
+  <script type="importmap">
+    { "imports": { "three": "./js/vendor/three.module.min.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="scene" aria-label="세계관 지구본과 인명록"></canvas>
+
+  <button id="to-book" class="nav-btn nav-right" type="button" aria-label="인명록 열기">
+    <span>인명록</span><span class="arrow" aria-hidden="true">&rsaquo;</span>
+  </button>
+  <button id="to-globe" class="nav-btn nav-left" type="button" aria-label="지구본으로 돌아가기" hidden>
+    <span class="arrow" aria-hidden="true">&lsaquo;</span><span>세계</span>
+  </button>
+
+  <div id="loading" aria-live="polite">불러오는 중…</div>
+  <noscript><p class="noscript">이 페이지는 JavaScript와 WebGL이 필요합니다.</p></noscript>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
