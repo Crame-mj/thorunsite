@@ -61,7 +61,8 @@ function resize() {
   const a = camera.aspect;
   // 각 오브젝트가 화면에 여유 있게 들어오도록 필요한 카메라 거리 계산 (반폭/반높이 기준)
   fit.globeDist = Math.max(1.45 / t, 1.3 / (t * a));
-  fit.bookDist = Math.max(1.12 / t, 1.45 / (t * a));
+  // 책은 기울어져 있어 앞쪽 모서리가 원근으로 커 보이므로 폭에 여유를 더 둔다
+  fit.bookDist = Math.max(1.05 / t, 1.7 / (t * a));
   // 화면 밖으로 밀어낼 거리: 더 먼 카메라 기준 보이는 반폭 + 오브젝트 크기
   const halfW = Math.max(fit.globeDist, fit.bookDist) * t * a;
   fit.offX = halfW + 1.6;
