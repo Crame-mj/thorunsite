@@ -28,7 +28,7 @@ OW, OH = 2048, 1024                     # 출력 크기 (2:1)
 
 # 원본 지도 좌표(px) 기준 영역
 ARKEH_BOX = (0, 0, 380, 215)            # Arkeh가 들어 있는 사각형
-ARKEH_EXCLUDE = (235, 135, 380, 215)    # 그 안에서 Ashadon에 걸치는 부분 (제외)
+ASHADON_ELLIPSE = (368, 248, 118, 106)  # Arkeh 근처의 Ashadon (중심 x, y, 반경 x, y) — 제외
 YUMIR_BAND_BOX = (430, 765, 1530, 892)  # 아래쪽 Yumir 띠
 YUMIR_BAND_EXCLUDE = (880, 740, 1030, 800)  # 그 안에서 Yidra 남쪽 끝 (제외)
 OCEAN_PATCH = (1460, 640, 1784, 770)    # 깨끗한 바다 질감 샘플
@@ -139,13 +139,50 @@ def region(box, exclude=None):
     return m
 
 
-arkeh_core = smoothstep(55, 110, lum_soft) * region(ARKEH_BOX, ARKEH_EXCLUDE)
-arkeh_alpha = mask_from(arkeh_core, 0, 1.5)        # 옮겨 붙일 때 쓰는 부드러운 알파
-arkeh_remove = mask_from(smoothstep(30, 60, lum_soft) * region(ARKEH_BOX, ARKEH_EXCLUDE), 41, 12)         # 지울 때는 번짐까지 넉넉히
+def outside_ellipse(cx, cy, rx, ry, feather=10):
+    """타원 바깥=1, 안쪽=0, 경계는 feather(px) 폭으로 부드럽게"""
+    yy, xx = np.mgrid[0:SH, 0:SW]
+    d = np.sqrt(((xx - cx) / rx) ** 2 + ((yy - cy) / ry) ** 2)
+    return smoothstep(1 - feather / min(rx, ry), 1, d).astype(np.float32)
+
+
+arkeh_area = region(ARKEH_BOX) * outside_ellipse(*ASHADON_ELLIPSE)
+arkeh_core = smoothstep(55, 110, lum_soft) * arkeh_area
+arkeh_alpha = mask_from(arkeh_core, 0, 1.5) * arkeh_area                       # 옮겨 붙일 때 쓰는 부드러운 알파
+# 지울 때는 번짐까지 넉넉히. 사각형으로 자르면 경계가 생기므로 Ashadon 타원만 피한다.
+arkeh_remove = mask_from(smoothstep(30, 60, lum_soft) * arkeh_area, 41, 16) * outside_ellipse(*ASHADON_ELLIPSE, feather=25)
 band_core = smoothstep(60, 120, lum_soft) * region(YUMIR_BAND_BOX, YUMIR_BAND_EXCLUDE)
 band_remove = mask_from(band_core, 25, 10)
 
 clean = fill_region(src, np.maximum(arkeh_remove, band_remove), ocean, lum_soft < 40)
+
+
+def fix_seam(img, band=70):
+    """지도 좌우 끝(경도 ±180°)이 만나는 곳의 어두운 비네팅 골을 없앤다.
+    이음매 양쪽 band(px) 구간의 바다 저주파 색을 양 끝 안쪽 값 사이 선형 보간으로 바꾼다."""
+    w = img.shape[1]
+    ocean_px = (gblur(img.mean(axis=2), 2.5) < 45).astype(np.float32)
+    lf = gblur(img * ocean_px[..., None], 8) / np.maximum(gblur(ocean_px, 8), 1e-3)[..., None]
+    right_ref = gblur(lf[:, w - 1 - band][:, None], 10)[:, 0]   # 이음매 왼쪽(지도 오른쪽 끝) 안쪽 기준값
+    left_ref = gblur(lf[:, band][:, None], 10)[:, 0]            # 이음매 오른쪽(지도 왼쪽 끝) 안쪽 기준값
+    cols = np.r_[np.arange(w - 1 - band, w), np.arange(0, band + 1)]
+    t = (np.arange(cols.size) / (cols.size - 1))[None, :, None]
+    target = right_ref[:, None] * (1 - t) + left_ref[:, None] * t
+    out = img.copy()
+    out[:, cols] += np.maximum(target - lf[:, cols], 0)  # 어두운 골을 메우는 방향으로만 보정
+
+    # 물결 무늬가 끊기는 부분만 이음매 바로 옆 몇 px을 서로 섞는다. (넓게 섞으면 근처 섬이 거울처럼 비친다)
+    # 이음매 바로 옆은 양쪽 50:50, 안쪽으로 갈수록 원래 그림으로 돌아간다.
+    xf = 8
+    s = (0.5 + 0.5 * smoothstep(0, 1, np.arange(xf) / xf))[None, :, None]
+    left = out[:, :xf].copy()
+    right = out[:, w - xf:][:, ::-1].copy()  # right[:, k] = 이음매에서 k번째 (지도 오른쪽 끝부터)
+    out[:, :xf] = left * s + right * (1 - s)
+    out[:, w - xf:] = (right * s + left * (1 - s))[:, ::-1]
+    return out
+
+
+clean = fix_seam(clean)
 
 # ------------------------------------------------------------------ 2. 재투영
 
