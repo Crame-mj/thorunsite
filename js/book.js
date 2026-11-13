@@ -1,10 +1,11 @@
 import * as THREE from 'three';
 
 // ---------------------------------------------------------------- 설정값
-const SEG = 32;              // 페이지 곡면 가로 분할 수
-const LIFT = 0.0015;         // 표시 페이지를 표지 면 위로 살짝 띄우는 값 (z-fighting 방지)
-const GUTTER_U = 0.22;       // 책등에서 종이가 솟아오르는 구간 (페이지 폭 대비 비율)
-const CURL = 0.5;            // 넘길 때 종이가 휘는 정도
+const SEG = 40;              // 페이지 곡면 가로 분할 수
+const LIFT = 0.0015;         // 표시 페이지를 종이 더미 윗면 위로 살짝 띄우는 값 (z-fighting 방지)
+const GUTTER_U = 0.2;        // 책등에서 종이가 솟아오르는 구간 (페이지 폭 대비 비율)
+const FORE_SLOPE = 0.12;     // 바깥쪽 종이 더미 경사면의 가로 폭 (펼쳤을 때 좌우 더미로 보이는 부분)
+const PAGE_LAG = 0.42;       // 넘길 때 책등 쪽이 바깥쪽보다 늦게 따라오는 정도 (클수록 많이 휨)
 const COVER_T = 0.03;        // 표지 보드 두께
 const EDGE_PERIOD = 0.03;    // 종이 단면 줄무늬 텍스처 한 주기의 실제 두께
 const TEX_W = 1024;          // 페이지 텍스처 가로 해상도
@@ -14,17 +15,20 @@ const INK = '#2b241b';
 const CLOTH = '#3b2119';
 
 /**
- * 두께 있는 책.
+ * 가운데를 펼친 두꺼운 책.
  *
  * 구성
- *  - 앞표지(경첩 회전) / 뒤표지 / 책등 : 고정 형태의 박스
- *  - 좌우 종이 더미(side) : 단면이 책등 쪽으로 휘어 내려가는 덩어리. 두께는 고정(펼치면 좌우 절반씩).
- *  - 좌우 표시 페이지 : 종이 더미의 윗면. 현재 펼친 위치(spread)에 맞춰 텍스처만 교체한다.
+ *  - 뒤쪽 반쪽(back half) : 뒤표지 + 오른쪽 종이 더미. 고정.
+ *  - 앞쪽 반쪽(front half): 앞표지 + 왼쪽 종이 더미. 책등 축으로 통째로 회전해서 책을 열고 닫는다.
+ *  - 종이 더미 단면 : 책등 쪽은 펼칠수록 휘어 내려가고, 바깥쪽은 비스듬히 깎여 있다.
+ *                     닫으면 바깥쪽에 V자 홈이 생기고, 펼치면 경사면이 좌우 종이 더미로 보인다.
+ *  - 책등 : 두 표지의 안쪽 끝을 잇는 곡면. 닫히면 C자로 감싸고 펼치면 접혀서 사라진다.
+ *  - 좌우 표시 페이지 : 종이 더미의 윗면. 펼친 위치(spread)에 맞춰 텍스처만 교체한다.
  *  - 넘김 페이지(leaf) : 한 장만 존재. 넘기는 동안에만 보이며 앞/뒷면 텍스처를 그때그때 지정한다.
  *
  * 페이지 번호 규칙
  *  pages[0..2S-1] 내용 페이지. spread k(0..S)에서
- *  왼쪽 = pages[2k-1] (k=0이면 면지), 오른쪽 = pages[2k] (k=S이면 면지)
+ *  왼쪽 = pages[2k-1] (k=0이면 빈 페이지), 오른쪽 = pages[2k] (k=S이면 빈 페이지)
  *  짝수 인덱스는 항상 오른쪽 페이지, 홀수는 항상 왼쪽 페이지다.
  */
 export class Book {
@@ -34,10 +38,12 @@ export class Book {
   }
 
   constructor({ renderer, pageWidth = 1.3, pageHeight = 1.8, people = [], title = '인명록', perPage = 2 }, portraits = new Map()) {
-    this.W = pageWidth;
+    this.W = pageWidth;                    // 종이 더미 전체 폭 (경사면 포함)
+    this.Wp = pageWidth - FORE_SLOPE;      // 윗면(내용이 보이는 페이지) 폭
     this.H = pageHeight;
-    this.Wc = pageWidth + 0.06;   // 표지는 종이보다 약간 크게
+    this.Wc = pageWidth + 0.05;            // 표지는 종이보다 약간 크게
     this.Hc = pageHeight + 0.1;
+    this.h = 0.11;                         // 반쪽 종이 더미 두께 (고정)
     this.anisotropy = renderer.capabilities.getMaxAnisotropy();
     this.portraits = portraits;
     this.title = title;
@@ -48,35 +54,30 @@ export class Book {
     }
     if (pages.length % 2) pages.push({ type: 'blank' });
     this.pages = pages;
-    this.S = pages.length / 2;                                     // 넘길 수 있는 장 수
-    this.T = 0.22;                                                 // 종이 전체 두께(시각용, 장 수와 무관)
+    this.S = pages.length / 2; // 넘길 수 있는 장 수
 
     // 상태
     this.k = 0;               // 현재 spread
     this.coverOpen = false;
-    this.coverP = 0;          // 앞표지 열림 정도 0~1
-    this.flip = null;         // { kind: 'page'|'cover', forward, p, target, dragging, dir }
-    this.tL = 0;              // 좌우 종이 더미 두께 (_updateSides에서 계산)
-    this.tR = this.T;
-    this._lastG = -1;
+    this.coverP = 0;          // 앞쪽 반쪽 열림 정도 0(닫힘)~1(펼침)
+    this.flip = null;         // { kind: 'page'|'cover', forward, p, target, dragging }
+    this._lastCoverP = -1;
     this._texCache = new Map();
 
     // 씬 그래프
     this.object = new THREE.Group();     // 화면 슬라이드용 (main.js가 제어)
     const tilt = new THREE.Group();
-    tilt.rotation.x = -0.7;              // 비스듬히 내려다보는 각도 → 아래쪽 단면(두께)이 보이게
+    tilt.rotation.x = -0.7;              // 비스듬히 내려다보는 각도 → 단면(두께)이 보이게
     this.object.add(tilt);
     this.inner = new THREE.Group();      // 닫힘/펼침에 따른 중앙 정렬용
     tilt.add(this.inner);
 
     this._buildMaterials();
-    this._buildCovers();
-    this.right = this._buildSide(false);
-    this.left = this._buildSide(true);
+    this._buildHalves();
+    this._buildSpine();
     this._buildLeaf();
 
-    this._updateSides(true);
-    this._updateCovers();
+    this._applyCover(true);
     this._refreshTextures();
     this.inner.position.x = this._centerTarget();
 
@@ -92,59 +93,41 @@ export class Book {
   // ================================================================ 구성
 
   _buildMaterials() {
-    this.clothMat = new THREE.MeshStandardMaterial({ color: CLOTH, roughness: 0.75 });
+    this.clothMat = new THREE.MeshStandardMaterial({ color: CLOTH, roughness: 0.75, side: THREE.DoubleSide });
     this.endpaperMat = new THREE.MeshStandardMaterial({
       map: this._canvasTex(this.Wc / this.Hc, (g, w, h) => drawEndpaper(g, w, h)),
       roughness: 0.9,
     });
-    this.coverArtMat = new THREE.MeshStandardMaterial({
-      map: this._canvasTex(this.Wc / this.Hc, (g, w, h) => drawCover(g, w, h, this.title)),
-      roughness: 0.7,
-    });
+    // 앞표지는 거울 배치 후 뒤집혀서 보이므로 UV를 좌우 반전
+    const coverTex = this._canvasTex(this.Wc / this.Hc, (g, w, h) => drawCover(g, w, h, this.title));
+    coverTex.repeat.x = -1;
+    coverTex.offset.x = 1;
+    this.coverArtMat = new THREE.MeshStandardMaterial({ map: coverTex, roughness: 0.7 });
     const edgeTex = createEdgeTexture();
     edgeTex.anisotropy = this.anisotropy;
     // 단면은 조명 반대쪽을 향하는 경우가 많아 너무 어두워지지 않도록 약하게 자체 발광
     this.edgeMat = new THREE.MeshStandardMaterial({
-      map: edgeTex, emissiveMap: edgeTex, emissive: 0x777777, roughness: 1, side: THREE.DoubleSide,
+      map: edgeTex, emissiveMap: edgeTex, emissive: 0x6a6a6a, roughness: 1, side: THREE.DoubleSide,
     });
   }
 
-  _buildCovers() {
+  /** 반쪽 책(표지 보드 + 종이 더미). 로컬: 책등 x=0, 바깥쪽 +x, 표지 z∈[-ct,0], 종이 z∈[0,h] */
+  _makeHalf(isFront) {
+    const group = new THREE.Group();
     const { Wc, Hc } = this;
     const c = this.clothMat;
 
-    // 앞표지: 경첩(hinge) 그룹을 y축 회전. 로컬 z∈[0,ct], +z면 = 표지 그림, -z면 = 면지
-    const frontGeo = new THREE.BoxGeometry(Wc, Hc, COVER_T);
-    frontGeo.translate(Wc / 2, 0, COVER_T / 2);
-    this.hinge = new THREE.Group();
-    this.hinge.add(new THREE.Mesh(frontGeo, [c, c, c, c, this.coverArtMat, this.endpaperMat]));
-    this.inner.add(this.hinge);
+    const boardGeo = new THREE.BoxGeometry(Wc, Hc, COVER_T);
+    boardGeo.translate(Wc / 2, 0, -COVER_T / 2);
+    // 면 순서: +x, -x, +y, -y, +z(안쪽 면지), -z(바깥 표지)
+    group.add(new THREE.Mesh(boardGeo, [c, c, c, c, this.endpaperMat, isFront ? this.coverArtMat : c]));
 
-    // 뒤표지: 오른쪽에 고정. 윗면(+z) = 면지
-    const backGeo = new THREE.BoxGeometry(Wc, Hc, COVER_T);
-    backGeo.translate(Wc / 2, 0, -COVER_T / 2);
-    this.inner.add(new THREE.Mesh(backGeo, [c, c, c, c, this.endpaperMat, c]));
-
-    // 책등: 닫혔을 때 왼쪽 옆면. 높이는 매 프레임 scale.z로 조절
-    const spineGeo = new THREE.BoxGeometry(COVER_T, Hc, 1);
-    spineGeo.translate(-COVER_T / 2, 0, 0.5);
-    this.spine = new THREE.Mesh(spineGeo, c);
-    this.spine.position.z = -COVER_T;
-    this.inner.add(this.spine);
-  }
-
-  /** 종이 더미 한쪽. mirror=true면 x를 뒤집어 왼쪽에 놓는다. */
-  _buildSide(mirror) {
-    const group = new THREE.Group();
-    if (mirror) group.scale.x = -1;
-    this.inner.add(group);
-
-    const pageGeo = new THREE.PlaneGeometry(this.W, this.H, SEG, 1);
+    const pageGeo = new THREE.PlaneGeometry(this.Wp, this.H, SEG, 1);
     const pageMat = new THREE.MeshStandardMaterial({ roughness: 0.92 });
     const page = new THREE.Mesh(pageGeo, pageMat);
 
-    // 단면: 위/아래 벽(각 SEG개 사각형) + 바깥쪽 벽 + 책등쪽 벽, 사각형당 정점 6개
-    const vcount = (SEG * 2 + 2) * 6;
+    // 단면: 위/아래 벽(각 SEG개 + 경사 1개) + 바깥 경사면 + 책등쪽 벽. 사각형당 정점 6개
+    const vcount = (SEG * 2 + 4) * 6;
     const edgeGeo = new THREE.BufferGeometry();
     edgeGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(vcount * 3), 3));
     edgeGeo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(vcount * 3), 3));
@@ -158,8 +141,33 @@ export class Book {
     };
   }
 
+  _buildHalves() {
+    this.right = this._makeHalf(false);
+    this.inner.add(this.right.group);
+
+    // 앞쪽 반쪽: pivot(책등, 종이 윗면 높이)을 축으로 회전. 내용물은 x 거울 배치.
+    this.pivotZ = LIFT + this.h;
+    this.frontPivot = new THREE.Group();
+    this.frontPivot.position.z = this.pivotZ;
+    this.left = this._makeHalf(true);
+    this.left.group.scale.x = -1;
+    this.left.group.position.z = -this.pivotZ;
+    this.frontPivot.add(this.left.group);
+    this.inner.add(this.frontPivot);
+  }
+
+  _buildSpine() {
+    const n = 16;
+    const geo = new THREE.PlaneGeometry(1, this.Hc, n, 1);
+    this.spineGeo = geo;
+    this.spineN = n;
+    this.spine = new THREE.Mesh(geo, this.clothMat);
+    this.inner.add(this.spine);
+    this._bz = [new THREE.Vector2(), new THREE.Vector2(), new THREE.Vector2(), new THREE.Vector2()];
+  }
+
   _buildLeaf() {
-    const geo = new THREE.PlaneGeometry(this.W, this.H, SEG, 1);
+    const geo = new THREE.PlaneGeometry(this.Wp, this.H, SEG, 1);
     // 넘김 페이지가 아래 표시 페이지와 겹칠 때 항상 위에 그려지도록
     const common = { roughness: 0.92, polygonOffset: true, polygonOffsetFactor: -1, polygonOffsetUnits: -4 };
     this.leafFrontMat = new THREE.MeshStandardMaterial({ ...common, side: THREE.FrontSide });
@@ -174,16 +182,16 @@ export class Book {
   // ================================================================ 형상 계산
 
   /**
-   * 종이 윗면 단면. 두께 T, 책등 휨 정도 g(0=평평, 1=책등에서 바닥까지 내려감).
-   * 각 구간의 길이를 W/SEG로 고정해서 계산하므로, 넘김 페이지가 같은 각도 배열을 쓰면 정확히 겹친다.
+   * 종이 윗면 단면 (책등 → 경사면 시작점). g: 책등 쪽 휨 정도(0=평평, 1=책등에서 바닥까지).
+   * 각 구간 길이를 Wp/SEG로 고정해서 계산하므로, 넘김 페이지가 같은 각도 배열을 쓰면 정확히 겹친다.
    */
-  _profile(T, g, out) {
-    const n = SEG, du = this.W / n;
+  _profile(g, out) {
+    const n = SEG, du = this.Wp / n, h = this.h;
     const r = (u) => (u >= GUTTER_U ? 1 : 1 - g * (1 - Math.sin((u / GUTTER_U) * Math.PI / 2)));
     out.x[0] = 0;
-    out.z[0] = LIFT + T * r(0);
+    out.z[0] = LIFT + h * r(0);
     for (let j = 1; j <= n; j++) {
-      const dz = THREE.MathUtils.clamp(T * (r(j / n) - r((j - 1) / n)), -du * 0.95, du * 0.95);
+      const dz = THREE.MathUtils.clamp(h * (r(j / n) - r((j - 1) / n)), -du * 0.95, du * 0.95);
       const a = Math.asin(dz / du);
       out.a[j - 1] = a;
       out.x[j] = out.x[j - 1] + Math.cos(a) * du;
@@ -191,88 +199,118 @@ export class Book {
     }
   }
 
-  _updateSide(side, T, g) {
-    const prof = side.prof;
-    this._profile(T, g, prof);
+  _updateHalf(half, g) {
+    const prof = half.prof;
+    this._profile(g, prof);
     const n = SEG;
 
     // 윗면 = 표시 페이지
-    const pp = side.pageGeo.attributes.position;
+    const pp = half.pageGeo.attributes.position;
     for (let i = 0; i < pp.count; i++) {
       const j = i % (n + 1);
       pp.setX(i, prof.x[j]);
       pp.setZ(i, prof.z[j]);
     }
     pp.needsUpdate = true;
-    side.pageGeo.computeVertexNormals();
-    side.pageGeo.computeBoundingSphere();
+    half.pageGeo.computeVertexNormals();
+    half.pageGeo.computeBoundingSphere();
 
-    // 단면 벽. v는 각 x 위치의 높이로 정규화 → 줄무늬가 종이 곡선을 따라간다.
-    const P = side.edgeGeo.attributes.position.array;
-    const UV = side.edgeGeo.attributes.uv.array;
-    const K = Math.max(T / EDGE_PERIOD, 0.01);
-    const h = this.H / 2;
+    // 단면 벽. v는 각 x 위치의 윗면 높이로 정규화 → 줄무늬가 종이 곡선을 따라간다.
+    const P = half.edgeGeo.attributes.position.array;
+    const UV = half.edgeGeo.attributes.uv.array;
+    const K = this.h / EDGE_PERIOD;
+    const hy = this.H / 2;
+    const xt = prof.x[n], zt = prof.z[n];      // 경사면 위쪽 끝
+    const xb = xt + FORE_SLOPE;                // 경사면 아래쪽 끝
     let pi = 0, ui = 0;
     const v = (x, y, z, u, vv) => { P[pi++] = x; P[pi++] = y; P[pi++] = z; UV[ui++] = u; UV[ui++] = vv; };
     const quad = (a, b, c, d) => { v(...a); v(...b); v(...c); v(...a); v(...c); v(...d); };
 
-    for (const y of [h, -h]) {
+    for (const y of [hy, -hy]) {
       for (let j = 0; j < n; j++) {
         const x0 = prof.x[j], x1 = prof.x[j + 1];
         quad([x0, y, 0, x0, 0], [x1, y, 0, x1, 0], [x1, y, prof.z[j + 1], x1, K], [x0, y, prof.z[j], x0, K]);
       }
+      // 경사 구간 (삼각형을 사각형 하나로)
+      quad([xt, y, 0, xt, 0], [xb, y, 0, xb, 0], [xb, y, 0, xb, 0], [xt, y, zt, xt, K]);
     }
-    const xe = prof.x[n], ze = prof.z[n];
-    quad([xe, -h, 0, 0, 0], [xe, h, 0, 1, 0], [xe, h, ze, 1, K], [xe, -h, ze, 0, K]);
+    // 바깥 경사면: 펼쳤을 때 좌우 종이 더미로 보이는 면
+    quad([xb, -hy, 0, 0, 0], [xb, hy, 0, 1, 0], [xt, hy, zt, 1, K], [xt, -hy, zt, 0, K]);
+    // 책등 쪽 벽
     const zs = prof.z[0];
-    quad([0, -h, 0, 0, 0], [0, h, 0, 1, 0], [0, h, zs, 1, K * zs / ze], [0, -h, zs, 0, K * zs / ze]);
+    quad([0, -hy, 0, 0, 0], [0, hy, 0, 1, 0], [0, hy, zs, 1, K * zs / zt], [0, -hy, zs, 0, K * zs / zt]);
 
-    side.edgeGeo.attributes.position.needsUpdate = true;
-    side.edgeGeo.attributes.uv.needsUpdate = true;
-    side.edgeGeo.computeVertexNormals();
-    side.edgeGeo.computeBoundingSphere();
-    side.edge.visible = T > 1e-4;
+    half.edgeGeo.attributes.position.needsUpdate = true;
+    half.edgeGeo.attributes.uv.needsUpdate = true;
+    half.edgeGeo.computeVertexNormals();
+    half.edgeGeo.computeBoundingSphere();
+  }
+
+  /** 앞쪽 반쪽 회전, 책등 곡면, 종이 휨을 coverP에 맞춰 갱신 */
+  _applyCover(force = false) {
+    const p = this.coverP;
+    if (!force && p === this._lastCoverP) return;
+    this._lastCoverP = p;
+
+    const g = easeInOut(p); // 펼칠수록 책등 쪽이 휘어 내려간다
+    this._updateHalf(this.right, g);
+    this._updateHalf(this.left, g);
+
+    // α=π: 닫힘(오른쪽 위에 포개짐), α=0: 펼침. π/2에서 위로 세워진 상태를 지난다.
+    const alpha = Math.PI * (1 - p);
+    this.frontPivot.rotation.y = alpha;
+    this._updateSpine(alpha);
+  }
+
+  /** 두 표지의 책등 쪽 끝을 3차 베지어로 잇는다. 펼친 상태에선 길이가 0이 되어 사라진다. */
+  _updateSpine(alpha) {
+    const ct2 = COVER_T / 2;
+    const [b0, b1, b2, b3] = this._bz;
+    // 뒤표지 책등 끝, 바깥 방향 (-1, 0)
+    b0.set(0, -ct2);
+    // 앞표지 책등 끝: 내용물 좌표 (0, -ct/2 - pivotZ)를 α만큼 회전 + pivot
+    const zr = -ct2 - this.pivotZ;
+    b3.set(zr * Math.sin(alpha), this.pivotZ + zr * Math.cos(alpha));
+    const dist = b0.distanceTo(b3);
+    this.spine.visible = dist > 1e-3;
+    if (!this.spine.visible) return;
+    const k = dist * 0.55;
+    b1.set(b0.x - k, b0.y);
+    b2.set(b3.x + Math.cos(alpha) * k, b3.y - Math.sin(alpha) * k);
+
+    const pos = this.spineGeo.attributes.position;
+    const n = this.spineN;
+    for (let i = 0; i < pos.count; i++) {
+      const t = (i % (n + 1)) / n, s = 1 - t;
+      const w0 = s * s * s, w1 = 3 * s * s * t, w2 = 3 * s * t * t, w3 = t * t * t;
+      pos.setX(i, w0 * b0.x + w1 * b1.x + w2 * b2.x + w3 * b3.x);
+      pos.setZ(i, w0 * b0.y + w1 * b1.y + w2 * b2.y + w3 * b3.y);
+    }
+    pos.needsUpdate = true;
+    this.spineGeo.computeVertexNormals();
+    this.spineGeo.computeBoundingSphere();
   }
 
   /**
-   * 종이 더미 두께는 넘긴 장 수와 무관하게 고정한다.
-   * 닫힘: 오른쪽에 전부 / 펼침: 좌우 절반씩. 그 사이는 앞표지 열림 정도로 보간.
+   * 넘김 페이지 변형.
+   * 페이지의 각 지점마다 진행도를 다르게 줘서(바깥쪽이 먼저, 책등 쪽이 나중에) 종이처럼 크게 휘게 한다.
+   * 진행도 0/1에서는 각각 오른쪽/왼쪽 표시 페이지의 단면과 정확히 일치한다.
    */
-  _updateSides(force = false) {
-    const g = easeInOut(this.coverP); // 표지가 열릴수록 책등 쪽이 휘어 내려간다
-    if (!force && g === this._lastG) return;
-    this._lastG = g;
-    this.tL = this.T * 0.5 * g;
-    this.tR = this.T - this.tL;
-    this._updateSide(this.right, this.tR, g);
-    this._updateSide(this.left, this.tL, g);
-    this.left.page.visible = this.tL > 1e-4;
-  }
-
-  _updateCovers() {
-    const p = this.coverP;
-    // 닫힘: 경첩이 오른쪽 종이 더미 위. 열림: 바닥까지 내려와 왼쪽에 평평하게.
-    const hz = (this.tR + LIFT + 0.001) * (1 - easeInOut(p));
-    this.hinge.position.z = hz;
-    this.hinge.rotation.y = -p * Math.PI;
-    const top = hz + COVER_T * (1 - p) - 0.002;
-    this.spine.scale.z = Math.max(top + COVER_T, 1e-4);
-  }
-
-  /** 넘김 페이지 변형: 오른쪽 단면 각도 → 왼쪽(거울) 단면 각도로 보간 + 진행 중엔 휘어짐 추가 */
   _updateLeaf() {
     const f = this.flip;
     if (!f || f.kind !== 'page') return;
-    const n = SEG, du = this.W / n;
-    const p = f.p;
+    const n = SEG, du = this.Wp / n;
     const aR = this.right.prof.a, aL = this.left.prof.a;
-    const bend = CURL * f.dir * Math.sin(p * Math.PI);
+    const q = f.forward ? f.p : 1 - f.p; // 들어올린 쪽 기준 진행도
     const xs = this._lx ??= new Float32Array(n + 1);
     const zs = this._lz ??= new Float32Array(n + 1);
     xs[0] = 0;
-    zs[0] = THREE.MathUtils.lerp(this.right.prof.z[0], this.left.prof.z[0], p);
+    zs[0] = THREE.MathUtils.lerp(this.right.prof.z[0], this.left.prof.z[0], f.p);
     for (let j = 0; j < n; j++) {
-      const phi = (1 - p) * aR[j] + p * (Math.PI - aL[j]) + bend * ((j + 0.5) / n);
+      const u = (j + 0.5) / n;
+      const qu = easeInOut(THREE.MathUtils.clamp((q - PAGE_LAG * (1 - u)) / (1 - PAGE_LAG), 0, 1));
+      const pu = f.forward ? qu : 1 - qu;
+      const phi = (1 - pu) * aR[j] + pu * (Math.PI - aL[j]);
       xs[j + 1] = xs[j] + Math.cos(phi) * du;
       zs[j + 1] = zs[j] + Math.sin(phi) * du;
     }
@@ -300,7 +338,7 @@ export class Book {
     return tex;
   }
 
-  /** key: 페이지 인덱스(number), 'endL'/'end'(앞/뒤 면지). 필요할 때 그리고 LRU로 보관. */
+  /** key: 페이지 인덱스(number), 'blankL'/'blankR'(앞뒤 끝의 빈 페이지). 필요할 때 그리고 LRU로 보관. */
   _pageTex(key) {
     const cache = this._texCache;
     if (cache.has(key)) {
@@ -308,11 +346,11 @@ export class Book {
       cache.delete(key); cache.set(key, t); // 최근 사용으로 갱신
       return t;
     }
-    const isEnd = typeof key !== 'number';
-    const isLeft = isEnd ? key === 'endL' : key % 2 === 1;
-    const page = isEnd ? { type: 'endpaper' } : this.pages[key];
-    const tex = this._canvasTex(this.W / this.H, (g, w, h) =>
-      drawPage(g, w, h, page, isLeft ? 'left' : 'right', isEnd ? null : key + 1, this.portraits));
+    const isBlank = typeof key !== 'number';
+    const isLeft = isBlank ? key === 'blankL' : key % 2 === 1;
+    const page = isBlank ? { type: 'blank' } : this.pages[key];
+    const tex = this._canvasTex(this.Wp / this.H, (g, w, h) =>
+      drawPage(g, w, h, page, isLeft ? 'left' : 'right', isBlank ? null : key + 1, this.portraits));
     if (isLeft) {
       // 왼쪽 페이지는 거울 배치(또는 뒷면)로 보이므로 UV를 뒤집어 바르게 보이게 한다.
       tex.repeat.x = -1;
@@ -339,10 +377,9 @@ export class Book {
     const Rs = f && f.forward ? k + 1 : k;    // 오른쪽에 보일 spread (넘김 페이지 아래에서 드러나는 쪽)
     const used = new Set();
 
-    // spread 0의 왼쪽 / 마지막 spread의 오른쪽은 면지
-    const lKey = Ls > 0 ? 2 * Ls - 1 : 'endL';
+    const lKey = Ls > 0 ? 2 * Ls - 1 : 'blankL';
     this.left.pageMat.map = this._pageTex(lKey); used.add(lKey);
-    const rKey = Rs < S ? 2 * Rs : 'end';
+    const rKey = Rs < S ? 2 * Rs : 'blankR';
     this.right.pageMat.map = this._pageTex(rKey); used.add(rKey);
 
     this.leaf.visible = !!f;
@@ -377,7 +414,6 @@ export class Book {
       kind, forward, dragging,
       p: forward ? 0 : 1,
       target: forward ? 0 : 1,  // 기본값은 '제자리' (드래그 놓을 때 결정)
-      dir: forward ? 1 : -1,
     };
     this._refreshTextures();
     return this.flip;
@@ -394,6 +430,7 @@ export class Book {
     } else {
       this.coverOpen = f.p === 1;
       this.coverP = f.p;
+      this._applyCover();
     }
     this.flip = null;
     this._refreshTextures();
@@ -433,7 +470,7 @@ export class Book {
     const forward = pt.x >= 0;
     const f = this._startFlip(forward, true);
     if (!f) return false;
-    const w = f.kind === 'cover' ? this.Wc : this.W;
+    const w = f.kind === 'cover' ? this.Wc : this.Wp;
     const now = performance.now();
     this._drag = {
       id: e.pointerId, w,
@@ -474,7 +511,6 @@ export class Book {
       const vel = now - d.lastT > 80 ? 0 : d.vel;
       f.target = f.p + vel * 180 > 0.5 ? 1 : 0; // 빠르게 튕기면 절반을 못 넘겨도 넘어감
     }
-    f.dir = f.target > f.p ? 1 : -1;
     f.dragging = false;
   }
 
@@ -485,13 +521,11 @@ export class Book {
     if (f && !f.dragging) {
       const diff = f.target - f.p;
       if (Math.abs(diff) < 1e-3) { f.p = f.target; this._finishFlip(); }
-      else f.p += diff * (1 - Math.exp(-dtMs * 0.009));
+      else f.p += diff * (1 - Math.exp(-dtMs * 0.006));
     }
-
     if (this.flip?.kind === 'cover') this.coverP = this.flip.p;
 
-    this._updateSides();
-    this._updateCovers();
+    this._applyCover();
     this._updateLeaf();
 
     this.inner.position.x += (this._centerTarget() - this.inner.position.x) * (1 - Math.exp(-dtMs * 0.006));
