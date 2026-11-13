@@ -6,8 +6,12 @@ import { PEOPLE, BOOK_TITLE } from './people.js';
 // 지구본 텍스처: 등장방형(equirectangular) 2:1 이미지
 // world-map-globe.webp는 원본(world-map.webp)을 극지방 왜곡이 덜하도록 재투영한 버전
 const GLOBE_TEXTURE_URL = 'assets/textures/world-map-globe.webp';
-// 책 텍스처: 표지 가죽, 내용 페이지 종이
-const BOOK_TEXTURES = { cover: 'assets/textures/cover-leather.jpg', paper: 'assets/textures/page-paper.jpg' };
+// 책 텍스처: 표지 가죽, 내용 페이지 종이, 종이 더미 단면
+const BOOK_TEXTURES = {
+  cover: 'assets/textures/cover-leather.jpg',
+  paper: 'assets/textures/page-paper.jpg',
+  edge: 'assets/textures/page-edge.jpg',
+};
 const TRANSITION_MS = 1100;
 
 const canvas = document.getElementById('scene');

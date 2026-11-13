@@ -36,15 +36,17 @@ export class Book {
    * opts.textures: { cover, paper } 이미지 경로 (선택).
    *  - cover: 표지·책등 가죽 질감. 표지 비율(약 5:7)에 맞춰 가운데 기준으로 채운다.
    *  - paper: 내용 페이지 배경. 페이지 비율(약 2:3)에 맞춰 가운데 기준으로 채운다.
+   *  - edge : 종이 더미 단면(옆·아래). 가로 = 단면 길이 방향, 세로 = 두께(위쪽이 페이지 면, 아래쪽이 표지 쪽).
    */
   static async create(opts) {
     const t = opts.textures ?? {};
-    const [portraits, cover, paper] = await Promise.all([
+    const [portraits, cover, paper, edge] = await Promise.all([
       loadPortraits(opts.people ?? []),
       t.cover ? loadImage(t.cover) : null,
       t.paper ? loadImage(t.paper) : null,
+      t.edge ? loadImage(t.edge) : null,
     ]);
-    return new Book(opts, portraits, { cover, paper });
+    return new Book(opts, portraits, { cover, paper, edge });
   }
 
   constructor({ renderer, pageWidth = 1.3, pageHeight = 1.8, people = [], title = '인명록', perPage = 2 }, portraits = new Map(), images = {}) {
@@ -120,11 +122,22 @@ export class Book {
     coverTex.repeat.x = -1;
     coverTex.offset.x = 1;
     this.coverArtMat = new THREE.MeshStandardMaterial({ map: coverTex, roughness: 0.7 });
-    const edgeTex = createEdgeTexture();
+    let edgeTex;
+    if (this.images.edge) {
+      // 이미지 한 장이 단면 전체를 덮는다 (두께 방향은 반복 없음)
+      edgeTex = new THREE.Texture(this.images.edge);
+      edgeTex.colorSpace = THREE.SRGBColorSpace;
+      edgeTex.wrapS = THREE.RepeatWrapping;
+      edgeTex.needsUpdate = true;
+      this.edgeK = 1;
+    } else {
+      edgeTex = createEdgeTexture();
+      this.edgeK = this.h / EDGE_PERIOD; // 줄무늬 텍스처를 두께 방향으로 반복
+    }
     edgeTex.anisotropy = this.anisotropy;
     // 단면은 조명 반대쪽을 향하는 경우가 많아 너무 어두워지지 않도록 약하게 자체 발광
     this.edgeMat = new THREE.MeshStandardMaterial({
-      map: edgeTex, emissiveMap: edgeTex, emissive: 0x6a6a6a, roughness: 1, side: THREE.DoubleSide,
+      map: edgeTex, emissiveMap: edgeTex, emissive: 0x8c8478, roughness: 1, side: THREE.DoubleSide,
     });
   }
 
@@ -235,7 +248,8 @@ export class Book {
     // 단면 벽. v는 각 x 위치의 윗면 높이로 정규화 → 줄무늬가 종이 곡선을 따라간다.
     const P = half.edgeGeo.attributes.position.array;
     const UV = half.edgeGeo.attributes.uv.array;
-    const K = this.h / EDGE_PERIOD;
+    const K = this.edgeK;
+    const uW = 1 / this.W; // 위/아래 벽의 u: 단면 길이에 맞춰 0~1
     const hy = this.H / 2;
     const xt = prof.x[n], zt = prof.z[n];      // 경사면 위쪽 끝
     const xb = xt + FORE_SLOPE;                // 경사면 아래쪽 끝
@@ -246,10 +260,10 @@ export class Book {
     for (const y of [hy, -hy]) {
       for (let j = 0; j < n; j++) {
         const x0 = prof.x[j], x1 = prof.x[j + 1];
-        quad([x0, y, 0, x0, 0], [x1, y, 0, x1, 0], [x1, y, prof.z[j + 1], x1, K], [x0, y, prof.z[j], x0, K]);
+        quad([x0, y, 0, x0 * uW, 0], [x1, y, 0, x1 * uW, 0], [x1, y, prof.z[j + 1], x1 * uW, K], [x0, y, prof.z[j], x0 * uW, K]);
       }
       // 경사 구간 (삼각형을 사각형 하나로)
-      quad([xt, y, 0, xt, 0], [xb, y, 0, xb, 0], [xb, y, 0, xb, 0], [xt, y, zt, xt, K]);
+      quad([xt, y, 0, xt * uW, 0], [xb, y, 0, xb * uW, 0], [xb, y, 0, xb * uW, 0], [xt, y, zt, xt * uW, K]);
     }
     // 바깥 경사면: 펼쳤을 때 좌우 종이 더미로 보이는 면
     quad([xb, -hy, 0, 0, 0], [xb, hy, 0, 1, 0], [xt, hy, zt, 1, K], [xt, -hy, zt, 0, K]);
