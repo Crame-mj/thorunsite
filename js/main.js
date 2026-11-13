@@ -3,8 +3,10 @@ import { Globe } from './globe.js';
 import { Book } from './book.js';
 import { PEOPLE, BOOK_TITLE } from './people.js';
 
-// 지구본 텍스처 이미지(등장방형 2:1)가 준비되면 경로를 넣으면 된다. 예: 'assets/world.jpg'
-const GLOBE_TEXTURE_URL = null;
+// 지구본 텍스처: 등장방형(equirectangular) 2:1 이미지
+const GLOBE_TEXTURE_URL = 'assets/textures/world-map.webp';
+// 책 텍스처: 표지 가죽, 내용 페이지 종이
+const BOOK_TEXTURES = { cover: 'assets/textures/cover-leather.jpg', paper: 'assets/textures/page-paper.jpg' };
 const TRANSITION_MS = 1100;
 
 const canvas = document.getElementById('scene');
@@ -44,7 +46,9 @@ await Promise.race([
   new Promise((r) => setTimeout(r, 2500)),
 ]);
 
-const book = await Book.create({ renderer, pageWidth: 1.3, pageHeight: 1.8, people: PEOPLE, title: BOOK_TITLE });
+const book = await Book.create({
+  renderer, pageWidth: 1.3, pageHeight: 1.8, people: PEOPLE, title: BOOK_TITLE, textures: BOOK_TEXTURES,
+});
 scene.add(book.object);
 
 // ------------------------------------------------------------------ 화면 맞춤

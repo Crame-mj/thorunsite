@@ -19,7 +19,9 @@ export class Globe {
     });
     this.mesh = new THREE.Mesh(new THREE.SphereGeometry(radius, 96, 64), this.material);
     // 처음 보이는 각도를 약간 기울여 입체감을 준다.
-    this.mesh.quaternion.setFromAxisAngle(AXIS_X, 0.35);
+    // 지도 가운데(경도 0°)가 정면에 오도록 돌리고, 위쪽을 살짝 앞으로 기울인다.
+    this.mesh.quaternion.setFromAxisAngle(AXIS_Y, -Math.PI / 2)
+      .premultiply(new THREE.Quaternion().setFromAxisAngle(AXIS_X, 0.35));
     this.object.add(this.mesh);
 
     this._drag = null;          // { id, x, y, t }

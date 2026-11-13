@@ -32,12 +32,22 @@ const CLOTH = '#3b2119';
  *  짝수 인덱스는 항상 오른쪽 페이지, 홀수는 항상 왼쪽 페이지다.
  */
 export class Book {
+  /**
+   * opts.textures: { cover, paper } 이미지 경로 (선택).
+   *  - cover: 표지·책등 가죽 질감. 표지 비율(약 5:7)에 맞춰 가운데 기준으로 채운다.
+   *  - paper: 내용 페이지 배경. 페이지 비율(약 2:3)에 맞춰 가운데 기준으로 채운다.
+   */
   static async create(opts) {
-    const portraits = await loadPortraits(opts.people ?? []);
-    return new Book(opts, portraits);
+    const t = opts.textures ?? {};
+    const [portraits, cover, paper] = await Promise.all([
+      loadPortraits(opts.people ?? []),
+      t.cover ? loadImage(t.cover) : null,
+      t.paper ? loadImage(t.paper) : null,
+    ]);
+    return new Book(opts, portraits, { cover, paper });
   }
 
-  constructor({ renderer, pageWidth = 1.3, pageHeight = 1.8, people = [], title = '인명록', perPage = 2 }, portraits = new Map()) {
+  constructor({ renderer, pageWidth = 1.3, pageHeight = 1.8, people = [], title = '인명록', perPage = 2 }, portraits = new Map(), images = {}) {
     this.W = pageWidth;                    // 종이 더미 전체 폭 (경사면 포함)
     this.Wp = pageWidth - FORE_SLOPE;      // 윗면(내용이 보이는 페이지) 폭
     this.H = pageHeight;
@@ -46,6 +56,7 @@ export class Book {
     this.h = 0.11;                         // 반쪽 종이 더미 두께 (고정)
     this.anisotropy = renderer.capabilities.getMaxAnisotropy();
     this.portraits = portraits;
+    this.images = images;
     this.title = title;
 
     const pages = [{ type: 'title', title }];
@@ -93,13 +104,23 @@ export class Book {
   // ================================================================ 구성
 
   _buildMaterials() {
-    this.clothMat = new THREE.MeshStandardMaterial({ color: CLOTH, roughness: 0.75, side: THREE.DoubleSide });
+    let leather = null;
+    if (this.images.cover) {
+      // 표지 옆면·책등·뒤표지 바깥면에 쓰는 가죽 질감
+      leather = new THREE.Texture(this.images.cover);
+      leather.colorSpace = THREE.SRGBColorSpace;
+      leather.anisotropy = this.anisotropy;
+      leather.needsUpdate = true;
+    }
+    this.clothMat = new THREE.MeshStandardMaterial({
+      color: leather ? 0xffffff : CLOTH, map: leather, roughness: 0.75, side: THREE.DoubleSide,
+    });
     this.endpaperMat = new THREE.MeshStandardMaterial({
       map: this._canvasTex(this.Wc / this.Hc, (g, w, h) => drawEndpaper(g, w, h)),
       roughness: 0.9,
     });
     // 앞표지는 거울 배치 후 뒤집혀서 보이므로 UV를 좌우 반전
-    const coverTex = this._canvasTex(this.Wc / this.Hc, (g, w, h) => drawCover(g, w, h, this.title));
+    const coverTex = this._canvasTex(this.Wc / this.Hc, (g, w, h) => drawCover(g, w, h, this.title, this.images.cover));
     coverTex.repeat.x = -1;
     coverTex.offset.x = 1;
     this.coverArtMat = new THREE.MeshStandardMaterial({ map: coverTex, roughness: 0.7 });
@@ -350,7 +371,7 @@ export class Book {
     const isLeft = isBlank ? key === 'blankL' : key % 2 === 1;
     const page = isBlank ? { type: 'blank' } : this.pages[key];
     const tex = this._canvasTex(this.Wp / this.H, (g, w, h) =>
-      drawPage(g, w, h, page, isLeft ? 'left' : 'right', isBlank ? null : key + 1, this.portraits));
+      drawPage(g, w, h, page, isLeft ? 'left' : 'right', isBlank ? null : key + 1, this.portraits, this.images.paper));
     if (isLeft) {
       // 왼쪽 페이지는 거울 배치(또는 뒷면)로 보이므로 UV를 뒤집어 바르게 보이게 한다.
       tex.repeat.x = -1;
@@ -543,7 +564,7 @@ function createEdgeTexture() {
   const c = document.createElement('canvas');
   c.width = w; c.height = h;
   const g = c.getContext('2d');
-  g.fillStyle = '#e6d5b0';
+  g.fillStyle = '#cbbb9c';
   g.fillRect(0, 0, w, h);
   let seed = 3;
   const rand = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
@@ -569,12 +590,24 @@ function drawEndpaper(g, w, h) {
   }
 }
 
-function drawCover(g, w, h, title) {
-  const grad = g.createLinearGradient(0, 0, w, h);
-  grad.addColorStop(0, '#4a2a22');
-  grad.addColorStop(1, '#2c1813');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, w, h);
+/** 이미지를 비율 유지한 채 (x,y,w,h) 영역을 꽉 채우도록 가운데 기준으로 잘라 그린다. */
+function drawImageCover(g, img, x, y, w, h) {
+  const iw = img.naturalWidth, ih = img.naturalHeight;
+  const s = Math.max(w / iw, h / ih);
+  const sw = w / s, sh = h / s;
+  g.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, x, y, w, h);
+}
+
+function drawCover(g, w, h, title, leather) {
+  if (leather) {
+    drawImageCover(g, leather, 0, 0, w, h);
+  } else {
+    const grad = g.createLinearGradient(0, 0, w, h);
+    grad.addColorStop(0, '#4a2a22');
+    grad.addColorStop(1, '#2c1813');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, w, h);
+  }
   const m = w * 0.07;
   g.strokeStyle = '#c9a964';
   g.lineWidth = 6;
@@ -588,10 +621,13 @@ function drawCover(g, w, h, title) {
   g.fillText(title, w / 2, h * 0.4);
 }
 
-function drawPage(g, w, h, page, side, pageNo, portraits) {
-  g.fillStyle = page.type === 'endpaper' ? '#cdb994' : PAPER;
-  g.fillRect(0, 0, w, h);
-  if (page.type === 'endpaper') return;
+function drawPage(g, w, h, page, side, pageNo, portraits, paper) {
+  if (paper) {
+    drawImageCover(g, paper, 0, 0, w, h);
+  } else {
+    g.fillStyle = PAPER;
+    g.fillRect(0, 0, w, h);
+  }
 
   // 책등 쪽 그림자: 오른쪽 페이지는 왼쪽 가장자리, 왼쪽 페이지는 오른쪽 가장자리
   const sw = w * 0.12;
@@ -699,6 +735,15 @@ function fillWrapped(g, text, x, y, maxW, lineH, maxLines) {
     out[out.length - 1] = last + '…';
   }
   out.forEach((l, i) => g.fillText(l, x, y + i * lineH));
+}
+
+function loadImage(url) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => { console.warn('[Book] 이미지 로드 실패:', url); resolve(null); };
+    img.src = url;
+  });
 }
 
 async function loadPortraits(people) {
