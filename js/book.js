@@ -106,7 +106,7 @@ export class Book {
   _buildMaterials() {
     let leather = null;
     if (this.images.cover) {
-      // 표지 옆면·책등·뒤표지 바깥면에 쓰는 가죽 질감
+      // 표지 안쪽 면·옆면·책등·뒤표지 바깥면에 쓰는 가죽 질감
       leather = new THREE.Texture(this.images.cover);
       leather.colorSpace = THREE.SRGBColorSpace;
       leather.anisotropy = this.anisotropy;
@@ -114,10 +114,6 @@ export class Book {
     }
     this.clothMat = new THREE.MeshStandardMaterial({
       color: leather ? 0xffffff : CLOTH, map: leather, roughness: 0.75, side: THREE.DoubleSide,
-    });
-    this.endpaperMat = new THREE.MeshStandardMaterial({
-      map: this._canvasTex(this.Wc / this.Hc, (g, w, h) => drawEndpaper(g, w, h)),
-      roughness: 0.9,
     });
     // 앞표지는 거울 배치 후 뒤집혀서 보이므로 UV를 좌우 반전
     const coverTex = this._canvasTex(this.Wc / this.Hc, (g, w, h) => drawCover(g, w, h, this.title, this.images.cover));
@@ -140,8 +136,8 @@ export class Book {
 
     const boardGeo = new THREE.BoxGeometry(Wc, Hc, COVER_T);
     boardGeo.translate(Wc / 2, 0, -COVER_T / 2);
-    // 면 순서: +x, -x, +y, -y, +z(안쪽 면지), -z(바깥 표지)
-    group.add(new THREE.Mesh(boardGeo, [c, c, c, c, this.endpaperMat, isFront ? this.coverArtMat : c]));
+    // 면 순서: +x, -x, +y, -y, +z(안쪽), -z(바깥 표지)
+    group.add(new THREE.Mesh(boardGeo, [c, c, c, c, c, isFront ? this.coverArtMat : c]));
 
     const pageGeo = new THREE.PlaneGeometry(this.Wp, this.H, SEG, 1);
     const pageMat = new THREE.MeshStandardMaterial({ roughness: 0.92 });
@@ -578,17 +574,6 @@ function createEdgeTexture() {
   return tex;
 }
 
-function drawEndpaper(g, w, h) {
-  g.fillStyle = '#cdb994';
-  g.fillRect(0, 0, w, h);
-  g.strokeStyle = 'rgba(90, 60, 30, 0.12)';
-  g.lineWidth = 2;
-  const s = w / 16;
-  for (let x = -h; x < w + h; x += s) {
-    g.beginPath(); g.moveTo(x, 0); g.lineTo(x + h, h); g.stroke();
-    g.beginPath(); g.moveTo(x, h); g.lineTo(x + h, 0); g.stroke();
-  }
-}
 
 /** 이미지를 비율 유지한 채 (x,y,w,h) 영역을 꽉 채우도록 가운데 기준으로 잘라 그린다. */
 function drawImageCover(g, img, x, y, w, h) {
