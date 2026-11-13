@@ -13,6 +13,7 @@ const TEX_CACHE = 10;        // 메모리에 유지할 페이지 텍스처 수
 const PAPER = '#f3ecdc';
 const INK = '#2b241b';
 const CLOTH = '#3b2119';
+const GUTTER_PAPER = '#8a7e69';  // 여닫을 때 책등 안쪽을 메우는 종이 색 (페이지 텍스처 책등 쪽 톤)
 
 /**
  * 가운데를 펼친 두꺼운 책.
@@ -194,6 +195,24 @@ export class Book {
     this.spine = new THREE.Mesh(geo, this.clothMat);
     this.inner.add(this.spine);
     this._bz = [new THREE.Vector2(), new THREE.Vector2(), new THREE.Vector2(), new THREE.Vector2()];
+
+    // 여닫는 도중 좌우 종이 더미 사이(책등 안쪽)가 비어 보이지 않도록 메우는 메쉬
+    //  - gutter: 두 페이지 윗면의 책등 쪽 끝을 잇는 U자 종이 곡면
+    //  - caps  : 위/아래 끝에서 그 아래 공간을 막는 단면 (종이 단면 텍스처)
+    const gn = 16;
+    this.gutterN = gn;
+    this.gutterGeo = new THREE.PlaneGeometry(1, this.H, gn, 1);
+    this.gutter = new THREE.Mesh(this.gutterGeo, new THREE.MeshStandardMaterial({
+      color: GUTTER_PAPER, roughness: 0.92, side: THREE.DoubleSide,
+    }));
+    const capVerts = 2 * (gn + 3) * 3; // 위/아래 × 다각형 꼭짓점 수(U 곡선 gn+1 + 2) × 삼각형 정점 3
+    this.capGeo = new THREE.BufferGeometry();
+    this.capGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(capVerts * 3), 3));
+    this.capGeo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(capVerts * 3), 3));
+    this.capGeo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(capVerts * 2), 2));
+    this.caps = new THREE.Mesh(this.capGeo, this.edgeMat);
+    this.inner.add(this.gutter, this.caps);
+    this._poly = Array.from({ length: gn + 3 }, () => new THREE.Vector2());
   }
 
   _buildLeaf() {
@@ -291,6 +310,74 @@ export class Book {
     const alpha = Math.PI * (1 - p);
     this.frontPivot.rotation.y = alpha;
     this._updateSpine(alpha);
+    this._updateGutter(alpha);
+  }
+
+  /** 여닫는 중 책등 안쪽 공간을 종이 곡면과 단면으로 메운다. 완전히 닫히거나 펼쳐지면 숨긴다. */
+  _updateGutter(alpha) {
+    const p = this.coverP;
+    const show = p > 1e-3 && p < 1 - 1e-3;
+    this.gutter.visible = this.caps.visible = show;
+    if (!show) return;
+
+    // 앞쪽 반쪽(거울 배치 + pivot 회전) 내용물 좌표 → inner 좌표
+    const pZ = this.pivotZ, ca = Math.cos(alpha), sa = Math.sin(alpha);
+    const toInner = (xc, zc) => {
+      const xm = -xc, zp = zc - pZ;
+      return [xm * ca + zp * sa, pZ - xm * sa + zp * ca];
+    };
+    const dirInner = (dx, dz) => [-dx * ca + dz * sa, dx * sa + dz * ca];
+
+    // 오른쪽 / 왼쪽 페이지 윗면의 책등 쪽 끝점과, 책등에서 멀어지는 방향
+    const R = [0, this.right.prof.z[0]];
+    const tR = [Math.cos(this.right.prof.a[0]), Math.sin(this.right.prof.a[0])];
+    const L = toInner(0, this.left.prof.z[0]);
+    const tL = dirInner(Math.cos(this.left.prof.a[0]), Math.sin(this.left.prof.a[0]));
+    const k = Math.hypot(R[0] - L[0], R[1] - L[1]) * 0.5;
+    const c0 = [R[0] - tR[0] * k, R[1] - tR[1] * k];
+    const c1 = [L[0] - tL[0] * k, L[1] - tL[1] * k];
+
+    const n = this.gutterN;
+    const poly = this._poly;
+    for (let j = 0; j <= n; j++) {
+      const t = j / n, s = 1 - t;
+      const w0 = s * s * s, w1 = 3 * s * s * t, w2 = 3 * s * t * t, w3 = t * t * t;
+      poly[j].set(w0 * R[0] + w1 * c0[0] + w2 * c1[0] + w3 * L[0], w0 * R[1] + w1 * c0[1] + w2 * c1[1] + w3 * L[1]);
+    }
+    const Lb = toInner(0, 0);         // 왼쪽 더미의 책등 쪽 아래 모서리
+    poly[n + 1].set(Lb[0], Lb[1]);
+    poly[n + 2].set(0, 0);            // 오른쪽 더미의 책등 쪽 아래 모서리
+
+    const gp = this.gutterGeo.attributes.position;
+    for (let i = 0; i < gp.count; i++) {
+      const v = poly[i % (n + 1)];
+      gp.setX(i, v.x);
+      gp.setZ(i, v.y);
+    }
+    gp.needsUpdate = true;
+    this.gutterGeo.computeVertexNormals();
+    this.gutterGeo.computeBoundingSphere();
+
+    // 위/아래 단면: 다각형 중심에서 부채꼴로 삼각형을 만든다
+    let cx = 0, cz = 0;
+    for (const v of poly) { cx += v.x; cz += v.y; }
+    cx /= poly.length; cz /= poly.length;
+    const P = this.capGeo.attributes.position.array, UV = this.capGeo.attributes.uv.array;
+    const m = poly.length;
+    let pi = 0, ui = 0;
+    const vtx = (x, y, z, v) => { P[pi++] = x; P[pi++] = y; P[pi++] = z; UV[ui++] = 0.5 + x / this.W; UV[ui++] = v; };
+    for (const y of [this.H / 2, -this.H / 2]) {
+      for (let i = 0; i < m; i++) {
+        const a = poly[i], b = poly[(i + 1) % m];
+        vtx(cx, y, cz, 0.4);
+        vtx(a.x, y, a.y, i <= n ? 1 : 0);
+        vtx(b.x, y, b.y, (i + 1) % m <= n ? 1 : 0);
+      }
+    }
+    this.capGeo.attributes.position.needsUpdate = true;
+    this.capGeo.attributes.uv.needsUpdate = true;
+    this.capGeo.computeVertexNormals();
+    this.capGeo.computeBoundingSphere();
   }
 
   /** 두 표지의 책등 쪽 끝을 3차 베지어로 잇는다. 펼친 상태에선 길이가 0이 되어 사라진다. */
