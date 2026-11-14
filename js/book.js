@@ -664,7 +664,7 @@ function drawCover(g, w, h, title, leather) {
   L.strokeRect(m * 1.4, m * 1.4, w - m * 2.8, h - m * 2.8);
   L.textAlign = 'center';
   L.textBaseline = 'middle';
-  L.font = `700 ${Math.round(w * 0.19)}px ${COVER_FONT}`;
+  L.font = `700 ${Math.round(w * 0.3)}px ${COVER_FONT}`;
   L.fillText(title, w / 2, h * 0.4);
 
   if (leather) {
