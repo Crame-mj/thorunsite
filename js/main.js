@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { Globe } from './globe.js';
 import { Book } from './book.js';
 import { PEOPLE, BOOK_TITLE } from './people.js';
+import { CONTINENTS } from './continents.js';
 
 // 지구본 텍스처: 등장방형(equirectangular) 2:1 이미지
 // world-map-globe.webp는 원본(world-map.webp)을 극지방 왜곡이 덜하도록 재투영한 버전
@@ -13,11 +14,19 @@ const BOOK_TEXTURES = {
   edge: 'assets/textures/page-edge.jpg',
 };
 const TRANSITION_MS = 1100;
+const ZOOM_MS = 1200;        // 대륙 선택 시 확대 시간 (지구본 회전 시간과 맞춤)
+const ZOOM_AMOUNT = 0.42;    // 확대 정도: 카메라 거리를 이 비율만큼 줄인다
 
 const canvas = document.getElementById('scene');
 const btnToBook = document.getElementById('to-book');
 const btnToGlobe = document.getElementById('to-globe');
 const loading = document.getElementById('loading');
+const continentList = document.getElementById('continent-list');
+const popup = document.getElementById('continent-popup');
+const popupTitle = document.getElementById('popup-title');
+const popupDesc = document.getElementById('popup-desc');
+const popupImage = document.getElementById('popup-image');
+const popupImageEmpty = document.getElementById('popup-image-empty');
 
 let renderer;
 try {
@@ -40,6 +49,7 @@ scene.add(sun);
 
 const globe = new Globe({ radius: 1 });
 if (GLOBE_TEXTURE_URL) globe.setTexture(GLOBE_TEXTURE_URL, renderer);
+globe.addPins(CONTINENTS);
 scene.add(globe.object);
 
 // 캔버스 텍스트에 웹폰트를 쓰려면 폰트가 먼저 로드돼야 한다. 실패/지연 시 기본 serif로 진행.
@@ -81,12 +91,15 @@ resize();
 
 // ------------------------------------------------------------------ 모드 전환
 
-const state = { mode: 'globe', t: 0 }; // t: 0=지구본 화면, 1=책 화면
+// t: 0=지구본 화면, 1=책 화면 / zoom: 0=기본, 1=대륙 확대
+const state = { mode: 'globe', t: 0, zoom: 0, zoomTarget: 0 };
 
 function setMode(mode) {
   state.mode = mode;
+  state.zoomTarget = 0;
   btnToBook.hidden = mode !== 'globe';
   btnToGlobe.hidden = mode !== 'book';
+  continentList.hidden = mode !== 'globe';
   (mode === 'globe' ? btnToBook : btnToGlobe).focus({ preventScroll: true });
 }
 btnToBook.addEventListener('click', () => setMode('book'));
@@ -98,10 +111,68 @@ function applyLayout() {
   const e = ease(state.t);
   globe.object.position.x = THREE.MathUtils.lerp(0, -fit.offX, e);
   book.object.position.x = THREE.MathUtils.lerp(fit.offX, 0, e);
-  camera.position.set(0, 0, THREE.MathUtils.lerp(fit.globeDist, fit.bookDist, e));
+  const zoom = 1 - ZOOM_AMOUNT * ease(state.zoom);
+  camera.position.set(0, 0, THREE.MathUtils.lerp(fit.globeDist, fit.bookDist, e) * zoom);
   camera.lookAt(0, 0, 0);
   globe.object.visible = e < 0.999;
   book.object.visible = e > 0.001;
+}
+
+// ------------------------------------------------------------------ 대륙 선택 / 팝업
+
+let popupReturnFocus = null;
+
+function focusContinent(id) {
+  if (activeController() !== 'globe' || globe.isFocusing || !popup.hidden) return;
+  state.zoomTarget = 1;
+  globe.focusOn(id, () => openPopup(id));
+}
+
+function openPopup(id) {
+  const c = CONTINENTS.find((x) => x.id === id);
+  if (!c) return;
+  popupTitle.textContent = c.name;
+  const hasDesc = Boolean(c.description && c.description.trim());
+  popupDesc.textContent = hasDesc ? c.description : '설명 준비 중';
+  popupDesc.classList.toggle('empty', !hasDesc);
+  if (c.image) {
+    popupImage.src = c.image;
+    popupImage.alt = `${c.name} 이미지`;
+    popupImage.hidden = false;
+    popupImageEmpty.hidden = true;
+  } else {
+    popupImage.removeAttribute('src');
+    popupImage.hidden = true;
+    popupImageEmpty.hidden = false;
+  }
+  popupReturnFocus = document.activeElement;
+  popup.hidden = false;
+  requestAnimationFrame(() => popup.classList.add('open'));
+  popup.querySelector('.popup-close').focus({ preventScroll: true });
+}
+
+function closePopup() {
+  if (popup.hidden) return;
+  popup.classList.remove('open');
+  setTimeout(() => { popup.hidden = true; }, 300);
+  state.zoomTarget = 0;
+  globe.select(null);
+  if (popupReturnFocus && document.contains(popupReturnFocus)) popupReturnFocus.focus({ preventScroll: true });
+  popupReturnFocus = null;
+}
+
+popup.addEventListener('click', (e) => {
+  if (e.target.closest('[data-close]')) closePopup();
+});
+
+for (const c of CONTINENTS) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'continent-btn';
+  btn.innerHTML = '<span class="dot" aria-hidden="true"></span>';
+  btn.append(document.createTextNode(c.name));
+  btn.addEventListener('click', () => focusContinent(c.id));
+  continentList.append(btn);
 }
 
 // ------------------------------------------------------------------ 입력
@@ -114,6 +185,13 @@ function activeController() {
 }
 
 let dragOwner = null;
+let tap = null; // 지구본을 짧게 눌렀는지 판정 (핀 클릭)
+const ndc = new THREE.Vector2();
+
+function toNdc(e) {
+  const rect = canvas.getBoundingClientRect();
+  return ndc.set(((e.clientX - rect.left) / rect.width) * 2 - 1, -((e.clientY - rect.top) / rect.height) * 2 + 1);
+}
 
 canvas.addEventListener('pointerdown', (e) => {
   if (dragOwner || (e.pointerType === 'mouse' && e.button !== 0)) return;
@@ -122,6 +200,7 @@ canvas.addEventListener('pointerdown', (e) => {
   const ok = c === 'globe' ? globe.pointerDown(e) : c === 'book' ? book.pointerDown(e, camera, rect) : false;
   if (!ok) return;
   dragOwner = c;
+  tap = c === 'globe' ? { x: e.clientX, y: e.clientY, t: performance.now() } : null;
   canvas.setPointerCapture(e.pointerId);
   canvas.classList.add('dragging');
   e.preventDefault();
@@ -130,12 +209,24 @@ canvas.addEventListener('pointerdown', (e) => {
 canvas.addEventListener('pointermove', (e) => {
   if (dragOwner === 'globe') globe.pointerMove(e, canvas.clientHeight);
   else if (dragOwner === 'book') book.pointerMove(e, camera, canvas.getBoundingClientRect());
+  else if (e.pointerType === 'mouse') {
+    // 핀 위에 마우스를 올리면 손가락 커서
+    const overPin = activeController() === 'globe' && !globe.isFocusing && globe.pick(toNdc(e), camera);
+    canvas.style.cursor = overPin ? 'pointer' : '';
+  }
 });
 
 function endDrag(e) {
   if (!dragOwner) return;
-  if (dragOwner === 'globe') globe.pointerUp(e);
-  else book.pointerUp(e);
+  if (dragOwner === 'globe') {
+    globe.pointerUp(e);
+    // 거의 움직이지 않고 짧게 눌렀다 떼면 클릭으로 보고 핀을 찾는다
+    if (tap && e.type === 'pointerup' && Math.hypot(e.clientX - tap.x, e.clientY - tap.y) < 6 && performance.now() - tap.t < 400) {
+      const id = globe.pick(toNdc(e), camera);
+      if (id) focusContinent(id);
+    }
+    tap = null;
+  } else book.pointerUp(e);
   if (!globe.isDragging && !book.isDragging) {
     dragOwner = null;
     canvas.classList.remove('dragging');
@@ -145,6 +236,7 @@ canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 
 window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { closePopup(); return; }
   if (activeController() !== 'book') return;
   if (e.key === 'ArrowRight') book.next();
   else if (e.key === 'ArrowLeft') book.prev();
@@ -159,6 +251,8 @@ function frame(now) {
 
   const dir = state.mode === 'book' ? 1 : -1;
   state.t = THREE.MathUtils.clamp(state.t + (dir * dt) / TRANSITION_MS, 0, 1);
+  const zdir = Math.sign(state.zoomTarget - state.zoom);
+  state.zoom = THREE.MathUtils.clamp(state.zoom + (zdir * dt) / ZOOM_MS, 0, 1);
   applyLayout();
 
   globe.update(dt);

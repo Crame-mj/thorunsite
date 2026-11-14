@@ -2,6 +2,16 @@ import * as THREE from 'three';
 
 const AXIS_X = new THREE.Vector3(1, 0, 0);
 const AXIS_Y = new THREE.Vector3(0, 1, 0);
+const FOCUS_MS = 1200;       // 핀을 정면으로 돌리는 시간
+
+/** 위도/경도(도) → 구 로컬 좌표의 단위 벡터 (three.js SphereGeometry의 UV 배치 기준) */
+export function latLonToVector(lat, lon, out = new THREE.Vector3()) {
+  const phi = ((lon + 180) / 360) * Math.PI * 2;
+  const theta = ((90 - lat) / 180) * Math.PI;
+  return out.set(-Math.cos(phi) * Math.sin(theta), Math.cos(theta), Math.sin(phi) * Math.sin(theta));
+}
+
+function easeInOutCubic(x) { return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2; }
 
 /**
  * 드래그로 회전시키는 구체.
@@ -29,6 +39,12 @@ export class Globe {
     this._qa = new THREE.Quaternion();
     this._qb = new THREE.Quaternion();
 
+    this.pins = [];             // { id, dir, group, head, hit }
+    this.selectedId = null;
+    this._focus = null;         // { from, to, t, onDone }
+    this._time = 0;
+    this._ray = new THREE.Raycaster();
+
     if (textureUrl) this.setTexture(textureUrl);
   }
 
@@ -50,9 +66,81 @@ export class Globe {
   }
 
   get isDragging() { return this._drag !== null; }
+  get isFocusing() { return this._focus !== null; }
+
+  /** 대륙마다 핀을 꽂는다. items: [{ id, lat, lon }] */
+  addPins(items) {
+    const stickGeo = new THREE.CylinderGeometry(0.005, 0.005, 0.07, 8);
+    stickGeo.translate(0, 0.035, 0);
+    const headGeo = new THREE.SphereGeometry(0.026, 20, 14);
+    const hitGeo = new THREE.SphereGeometry(0.085, 10, 8); // 손가락으로도 누르기 쉽게 넉넉한 판정 범위
+    const stickMat = new THREE.MeshStandardMaterial({ color: 0xd9c8a0, roughness: 0.5, metalness: 0.3 });
+    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+
+    for (const item of items) {
+      const dir = latLonToVector(item.lat, item.lon);
+      const group = new THREE.Group();
+      group.position.copy(dir).multiplyScalar(this.radius);
+      group.quaternion.setFromUnitVectors(AXIS_Y, dir); // 핀이 지표면에서 바깥쪽으로 서도록
+      const headMat = new THREE.MeshStandardMaterial({
+        color: 0xe8c46a, emissive: 0x7a5410, emissiveIntensity: 0.6, roughness: 0.35, metalness: 0.4,
+      });
+      const head = new THREE.Mesh(headGeo, headMat);
+      head.position.y = 0.07;
+      const hit = new THREE.Mesh(hitGeo, hitMat);
+      hit.position.y = 0.05;
+      hit.userData.pinId = item.id;
+      group.add(new THREE.Mesh(stickGeo, stickMat), head, hit);
+      this.mesh.add(group);
+      this.pins.push({ id: item.id, dir, group, head, hit });
+    }
+  }
+
+  /** 화면 좌표(ndc)에서 보이는 핀의 id를 찾는다. 지구 뒤쪽에 가려진 핀은 고르지 않는다. */
+  pick(ndc, camera) {
+    if (!this.pins.length) return null;
+    this._ray.setFromCamera(ndc, camera);
+    const hits = this._ray.intersectObjects([this.mesh, ...this.pins.map((p) => p.hit)], false);
+    if (!hits.length) return null;
+    // 지구 표면보다 앞에 있는 핀 판정만 인정 (지구 표면과 거의 같은 거리면 핀이 앞에 있는 것으로 본다)
+    const globeHit = hits.find((h) => h.object === this.mesh);
+    const pinHit = hits.find((h) => h.object.userData.pinId);
+    if (!pinHit) return null;
+    if (globeHit && globeHit.distance < pinHit.distance - 0.12) return null;
+    return pinHit.object.userData.pinId;
+  }
+
+  select(id) { this.selectedId = id; }
+
+  /** 해당 핀이 화면 정면(카메라 쪽)에, 북쪽이 위로 오도록 회전한다. */
+  focusOn(id, onDone) {
+    const pin = this.pins.find((p) => p.id === id);
+    if (!pin) return;
+    const p = pin.dir;
+    const north = AXIS_Y.clone().addScaledVector(p, -AXIS_Y.dot(p));
+    if (north.lengthSq() < 1e-6) {
+      // 극점: 현재 화면 위쪽 방향을 그대로 유지
+      north.copy(AXIS_Y).applyQuaternion(this.mesh.quaternion.clone().invert());
+      north.addScaledVector(p, -north.dot(p));
+    }
+    north.normalize();
+    const east = new THREE.Vector3().crossVectors(north, p).normalize();
+    // 행 = east, north, p 인 회전행렬 → east→x, north→y, p→z(카메라 쪽)
+    const m = new THREE.Matrix4().set(
+      east.x, east.y, east.z, 0,
+      north.x, north.y, north.z, 0,
+      p.x, p.y, p.z, 0,
+      0, 0, 0, 1,
+    );
+    const to = new THREE.Quaternion().setFromRotationMatrix(m);
+    this._vel.x = this._vel.y = 0;
+    this._drag = null;
+    this._focus = { from: this.mesh.quaternion.clone(), to, t: 0, onDone };
+    this.selectedId = id;
+  }
 
   pointerDown(e) {
-    if (this._drag) return false;
+    if (this._drag || this._focus) return false;
     this._drag = { id: e.pointerId, x: e.clientX, y: e.clientY, t: performance.now() };
     this._vel.x = this._vel.y = 0;
     return true;
@@ -83,6 +171,26 @@ export class Globe {
   }
 
   update(dtMs) {
+    this._time += dtMs;
+    // 핀 머리가 은은하게 숨 쉬듯 커졌다 작아지고, 선택된 핀은 더 크고 밝게
+    for (const pin of this.pins) {
+      const sel = pin.id === this.selectedId;
+      const s = (sel ? 1.35 : 1) * (1 + 0.12 * Math.sin(this._time * 0.004 + pin.dir.x * 5));
+      pin.head.scale.setScalar(s);
+      pin.head.material.emissiveIntensity = sel ? 1.2 : 0.6;
+    }
+
+    const f = this._focus;
+    if (f) {
+      f.t = Math.min(f.t + dtMs / FOCUS_MS, 1);
+      this.mesh.quaternion.slerpQuaternions(f.from, f.to, easeInOutCubic(f.t));
+      if (f.t >= 1) {
+        this._focus = null;
+        f.onDone?.();
+      }
+      return;
+    }
+
     if (this._drag) return;
     const v = this._vel;
     if (Math.abs(v.x) < 1e-6 && Math.abs(v.y) < 1e-6) return;
