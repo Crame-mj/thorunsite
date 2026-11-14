@@ -40,7 +40,31 @@ export const CONTINENTS = [
     ],
   },
   { id: 'soran', name: '소란', nameEn: 'Soran', lat: 22.8, lon: 105.9, image: 'assets/continents/soran.webp', description: '' },
-  { id: 'alkahran', name: '알카란', nameEn: 'Alkahran', lat: -18.6, lon: -124.9, image: 'assets/continents/alkahran.webp', description: '' },
+  { id: 'alkahran', name: '알카란', nameEn: 'Alkahran', lat: -18.6, lon: -124.9, image: 'assets/continents/alkahran.webp',
+    description: '알카란은 거친 사암 협곡과 황무지, 사막으로 이루어진 척박한 땅이다. 주 종족은 인간과 수인인데, 수인 중에서도 리자드맨처럼 파충류 수인이 많다. 대체로 수인에 대한 대우는 좋지 못하며, 아예 야만인이나 노예 취급하기도 한다. 땅이 메말라 농사는 어렵지만 지하 자원이 풍부하기에 알카란의 국가들은 이것을 바탕으로 고유한 기술을 갖추거나 무역품으로 가공해 판매하는 방식으로 발전했다.',
+    regions: [
+      {
+        id: 'sharif', name: '샤리프', nameEn: 'Sharif', x: 55.3, y: 18.7,
+        image: 'assets/regions/alkahran/sharif.webp',
+        description: '알카란 북부에 위치한 나라로, 척박한 사암지대를 기반으로 하지만 광물 자원이 풍부하게 매장되어 있어 이를 가공한 아름다운 보석과 장신구가 발달했다. 북동부 해안을 통해 라니엘과 교역을 하며 부를 축적했으며, 무역이 주요 수입 수단인 만큼 타 국가와 가능한 원만한 관계를 유지하려고 노력한다.',
+      },
+      {
+        id: 'zantar', name: '잔타르', nameEn: 'Zantar', x: 24.1, y: 46.7,
+        image: 'assets/regions/alkahran/zantar.webp',
+        description: '알카란 중심부에 위치한 나라로, 지하 자원을 이용해 독자적인 기술을 발전시켰다. 잔타르의 국민들은 힘을 숭상하며 더욱 강인해지기 위해 자신의 신체를 개조하는 것도 마다하지 않는다. 주 종족은 인간이며 타 종족을 배척하지만, 강함을 증명한다면 소속으로 받아들이기도 한다.',
+      },
+      {
+        id: 'barako', name: '바라코', nameEn: 'Barako', x: 84.0, y: 51.2,
+        image: 'assets/regions/alkahran/barako.webp',
+        description: '알카란 동부에 위치한 군도로, 나라라기 보다는 파충류 수인들이 모여 사는 일종의 큰 부락에 가깝다. 생선을 비롯한 질 좋은 해산물이 주요 특산품이며, 샤리프의 중계를 통해 다양한 국가와 교류하고 있다.',
+      },
+      {
+        id: 'azit', name: '아짓', nameEn: 'Azit', x: 40.7, y: 75.3,
+        image: 'assets/regions/alkahran/azit.webp',
+        description: '알카란 남부에 위치한 나라로, 거대한 오아시스를 품고 있어 알카란에서 유일하게 드넓은 농경지를 가졌다. 풍부한 식자원을 바탕으로 안정적으로 발전했으며, 국민들은 이 풍요로움을 태양신의 은총이라 여긴다. 아짓의 왕은 태양신의 화신으로 추앙된다.',
+      },
+    ],
+  },
   { id: 'eremos', name: '에레모스', nameEn: 'Eremos', lat: -34.4, lon: -36.0, image: 'assets/continents/eremos.webp', description: '' },
   { id: 'yidra', name: '이드라', nameEn: 'Yidra', lat: -22.4, lon: 28.3, image: 'assets/continents/yidra.webp', description: '' },
   { id: 'yumir', name: '유미르', nameEn: 'Yumir', lat: -88.0, lon: 0.0, image: 'assets/continents/yumir.webp', description: '' },
