@@ -49,7 +49,7 @@ export class Book {
     return new Book(opts, portraits, { cover, paper, edge });
   }
 
-  constructor({ renderer, pageWidth = 1.3, pageHeight = 1.8, people = [], title = '인명록', perPage = 2 }, portraits = new Map(), images = {}) {
+  constructor({ renderer, pageWidth = 1.3, pageHeight = 1.8, people = [], title = '개념서', perPage = 2 }, portraits = new Map(), images = {}) {
     this.W = pageWidth;                    // 종이 더미 전체 폭 (경사면 포함)
     this.Wp = pageWidth - FORE_SLOPE;      // 윗면(내용이 보이는 페이지) 폭
     this.H = pageHeight;
