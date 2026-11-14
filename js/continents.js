@@ -39,7 +39,31 @@ export const CONTINENTS = [
       },
     ],
   },
-  { id: 'soran', name: '소란', nameEn: 'Soran', lat: 22.8, lon: 105.9, image: 'assets/continents/soran.webp', description: '' },
+  { id: 'soran', name: '소란', nameEn: 'Soran', lat: 22.8, lon: 105.9, image: 'assets/continents/soran.webp',
+    description: '소란은 거친 산맥과 넓은 평야, 그리고 화산지대가 특징적인 동방의 대륙이다. 다른 대륙과의 거리가 꽤 있어 교류가 한정적인 만큼, 타 대륙의 민족들과 확연한 문화 차이를 보인다. 주 종족은 인간과 수인이며, 고유한 무술을 연마하는 것을 중요시하는 특유의 분위기 덕에 출신이나 종족보다는 얼마나 뛰어난 무인인지가 그 사람에 대한 대우를 정하는 데에 큰 영향을 미친다.',
+    regions: [
+      {
+        id: 'jisim', name: '지심산', nameEn: 'Jisim', x: 35.0, y: 19.5,
+        image: 'assets/regions/soran/jisim.webp',
+        description: '소란 북부에 위치한 거대한 화산이다. 큰 화산인 만큼 분화 후 주변 넓은 지역을 재로 덮어버렸다. 아직도 용암이 들끓는 활화산으로, 소란의 주민들에게 이곳은 대지의 심장으로 불리며 두렵고도 신성한 땅으로 여겨진다.',
+      },
+      {
+        id: 'goguk', name: '고국', nameEn: 'Goguk', x: 65.3, y: 26.6,
+        image: 'assets/regions/soran/goguk.webp',
+        description: '소란 북동부에서 서부에 걸친 긴 영토를 가진 나라로, 왕권국가다. 상류층은 대부분 인간으로, 수인에 대한 직접적인 차별은 없지만 인간에 비해 낮게 보는 사회적 인식이 있다. 서부 항구를 통해 라니엘과 주로 교류하며, 특산품은 활과 직물이다. 무예의 경우 초장거리 궁술에 강하다.',
+      },
+      {
+        id: 'soryujin', name: '소류진', nameEn: 'Soryujin', x: 38.7, y: 77.8,
+        image: 'assets/regions/soran/soryujin.webp',
+        description: '소란 남부에 위치한 나라로, 자연과 어우러진 고즈넉한 풍경이 특징이다. 다양한 꽃차가 특산물이며, 라니엘과는 주로 고국의 중계를 통해 교류하지만, 알카란과는 남쪽의 작은 항구를 통해 직접 무역을 한다. 무예의 경우 빠른 발도술이 특징인 검술에 강하다.',
+      },
+      {
+        id: 'chenkun-gung', name: '첸쿤궁', nameEn: 'Chenkun-gung', x: 81.1, y: 57.8,
+        image: 'assets/regions/soran/chenkun-gung.webp',
+        description: '소란 동부 거친 산맥에 위치한 곳으로, 공식적인 국가는 아니지만 실질적 지도자라 할 수 있는 수도원장의 존재에 더해, 이곳의 수도승들은 그 어느 나라에도 속하지 않아 타국에서는 준 국가로 여겨진다. 오직 수련을 통한 통달만을 목적으로 살아가는 이들이기에, 뛰어난 경지에 오른 무인들이 많다.',
+      },
+    ],
+  },
   { id: 'alkahran', name: '알카란', nameEn: 'Alkahran', lat: -18.6, lon: -124.9, image: 'assets/continents/alkahran.webp',
     description: '알카란은 거친 사암 협곡과 황무지, 사막으로 이루어진 척박한 땅이다. 주 종족은 인간과 수인인데, 수인 중에서도 리자드맨처럼 파충류 수인이 많다. 대체로 수인에 대한 대우는 좋지 못하며, 아예 야만인이나 노예 취급하기도 한다. 땅이 메말라 농사는 어렵지만 지하 자원이 풍부하기에 알카란의 국가들은 이것을 바탕으로 고유한 기술을 갖추거나 무역품으로 가공해 판매하는 방식으로 발전했다.',
     regions: [
