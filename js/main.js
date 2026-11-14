@@ -28,6 +28,9 @@ const popupTitle = document.getElementById('popup-title');
 const popupDesc = document.getElementById('popup-desc');
 const popupImage = document.getElementById('popup-image');
 const popupImageEmpty = document.getElementById('popup-image-empty');
+const popupZoomHint = document.getElementById('popup-zoom-hint');
+const lightbox = document.getElementById('lightbox');
+const lightboxImage = document.getElementById('lightbox-image');
 
 let renderer;
 try {
@@ -144,10 +147,12 @@ function openPopup(id) {
     popupImage.alt = `${displayName(c)} 이미지`;
     popupImage.hidden = false;
     popupImageEmpty.hidden = true;
+    popupZoomHint.hidden = false;
   } else {
     popupImage.removeAttribute('src');
     popupImage.hidden = true;
     popupImageEmpty.hidden = false;
+    popupZoomHint.hidden = true;
   }
   popupReturnFocus = document.activeElement;
   popup.hidden = false;
@@ -167,6 +172,19 @@ function closePopup() {
 
 popup.addEventListener('click', (e) => {
   if (e.target.closest('[data-close]')) closePopup();
+});
+
+// 팝업 이미지를 누르면 화면 전체로 크게 본다. 아무 곳이나 누르면 닫힌다.
+popupImage.addEventListener('click', () => {
+  lightboxImage.src = popupImage.src;
+  lightboxImage.alt = popupImage.alt;
+  lightbox.hidden = false;
+});
+lightbox.addEventListener('click', () => { lightbox.hidden = true; });
+
+// 팝업에 들어갈 이미지를 미리 받아 둔다 (팝업이 뜰 때 늦게 그려지지 않도록)
+window.addEventListener('load', () => {
+  for (const c of CONTINENTS) if (c.image) new Image().src = c.image;
 });
 
 for (const c of CONTINENTS) {
@@ -240,7 +258,11 @@ canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') { closePopup(); return; }
+  if (e.key === 'Escape') {
+    if (!lightbox.hidden) lightbox.hidden = true;
+    else closePopup();
+    return;
+  }
   if (activeController() !== 'book') return;
   if (e.key === 'ArrowRight') book.next();
   else if (e.key === 'ArrowLeft') book.prev();

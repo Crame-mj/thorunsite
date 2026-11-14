@@ -179,12 +179,15 @@ html, body {
 }
 
 .popup-panel {
+  /* 이미지 칸은 이미지 비율에 맞춰 크기가 정해지고, 설명 칸은 고정 폭 */
+  --desc-w: clamp(280px, 30vw, 380px);
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  width: min(920px, 100%);
-  height: min(560px, calc(100dvh - 32px));
-  background: rgba(20, 18, 16, 0.92);
+  grid-template-columns: auto var(--desc-w);
+  max-width: calc(100vw - 32px);
+  min-height: min(420px, calc(100dvh - 32px));
+  max-height: calc(100dvh - 32px);
+  background: rgba(20, 18, 16, 0.94);
   border: 1px solid rgba(233, 228, 216, 0.25);
   border-radius: 12px;
   box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
@@ -198,32 +201,50 @@ html, body {
 
 .popup-media {
   position: relative;
-  background: rgba(233, 228, 216, 0.05);
+  background: #07090e;
   border-right: 1px solid rgba(233, 228, 216, 0.15);
   display: grid;
   place-items: center;
   min-height: 0;
+  min-width: 280px;
 }
 .popup-media img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
   display: block;
+  /* 원본 비율 유지, 원본보다 크게 늘리지 않음 → 흐려지지 않는다 */
+  width: auto;
+  height: auto;
+  max-width: calc(100vw - 32px - var(--desc-w) - 2px);
+  max-height: calc(100dvh - 34px);
+  cursor: zoom-in;
 }
 .popup-media img[hidden] { display: none; }
 .popup-empty, .popup-desc.empty {
   color: rgba(233, 228, 216, 0.4);
   font-size: 0.9rem;
 }
+.popup-empty { padding: 120px 40px; }
+.popup-zoom-hint {
+  position: absolute;
+  left: 10px;
+  bottom: 10px;
+  padding: 0.25em 0.7em;
+  font-size: 0.75rem;
+  color: var(--fg);
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 999px;
+  pointer-events: none;
+}
+.popup-zoom-hint[hidden] { display: none; }
 
 .popup-body {
-  padding: 32px 32px 28px;
+  padding: 32px 28px 28px;
   overflow-y: auto;
   min-height: 0;
 }
 .popup-body h2 {
   margin: 0 0 0.8em;
-  font-size: 1.6rem;
+  padding-right: 36px;
+  font-size: 1.5rem;
   font-weight: 700;
   letter-spacing: 0.02em;
 }
@@ -253,12 +274,33 @@ html, body {
   /* 좁은 화면: 이미지 위, 설명 아래로 쌓는다 */
   .popup-panel {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(0, 42%) minmax(0, 1fr);
-    height: min(640px, calc(100dvh - 32px));
+    grid-template-rows: auto minmax(0, 1fr);
+    width: calc(100vw - 32px);
+    min-height: 0;
   }
-  .popup-media { border-right: none; border-bottom: 1px solid rgba(233, 228, 216, 0.15); }
-  .popup-body { padding: 20px 20px 24px; }
-  .popup-body h2 { font-size: 1.35rem; }
+  .popup-media { border-right: none; border-bottom: 1px solid rgba(233, 228, 216, 0.15); min-width: 0; }
+  .popup-media img { max-width: 100%; max-height: 55dvh; }
+  .popup-empty { padding: 60px 20px; }
+  .popup-body { padding: 18px 20px 24px; }
+  .popup-body h2 { font-size: 1.3rem; }
+}
+
+/* 이미지 크게 보기 */
+.lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  background: rgba(3, 4, 8, 0.92);
+  cursor: zoom-out;
+}
+.lightbox[hidden] { display: none; }
+.lightbox img {
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  width: auto;
+  height: auto;
 }
 
 @media (prefers-reduced-motion: reduce) {
