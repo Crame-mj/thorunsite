@@ -21,6 +21,7 @@ const canvas = document.getElementById('scene');
 const btnToBook = document.getElementById('to-book');
 const btnToGlobe = document.getElementById('to-globe');
 const loading = document.getElementById('loading');
+const bgVideo = document.getElementById('bg');
 const continentList = document.getElementById('continent-list');
 const popup = document.getElementById('continent-popup');
 const popupTitle = document.getElementById('popup-title');
@@ -30,14 +31,15 @@ const popupImageEmpty = document.getElementById('popup-image-empty');
 
 let renderer;
 try {
-  renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // alpha: 캔버스를 투명하게 해서 뒤의 배경 영상(#bg)이 보이도록
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
 } catch (err) {
   loading.textContent = '이 브라우저에서는 WebGL을 사용할 수 없습니다.';
   throw err;
 }
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.outputColorSpace = THREE.SRGBColorSpace;
-renderer.setClearColor(0x0b0e17);
+renderer.setClearColor(0x000000, 0);
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
@@ -265,3 +267,7 @@ function frame(now) {
 requestAnimationFrame(frame);
 
 loading.classList.add('done');
+
+// 배경 영상: 움직임 줄이기 설정이면 첫 프레임에 멈춘다. 자동재생이 막혀도 poster 이미지가 보이므로 오류는 무시.
+if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) bgVideo.pause();
+else bgVideo.play().catch(() => {});
