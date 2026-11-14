@@ -607,6 +607,7 @@ function easeInOut(x) { return x * x * (3 - 2 * x); }
 // ==================================================================== 텍스처 그리기
 
 const FONT = '"Noto Serif KR", serif';
+const COVER_FONT = '"Lobster Two", "Noto Serif KR", serif'; // 표지 제목 전용
 
 function createEdgeTexture() {
   const w = 16, h = 64;
@@ -663,7 +664,7 @@ function drawCover(g, w, h, title, leather) {
   L.strokeRect(m * 1.4, m * 1.4, w - m * 2.8, h - m * 2.8);
   L.textAlign = 'center';
   L.textBaseline = 'middle';
-  L.font = `700 ${Math.round(w * 0.125)}px ${FONT}`;
+  L.font = `700 ${Math.round(w * 0.19)}px ${COVER_FONT}`;
   L.fillText(title, w / 2, h * 0.4);
 
   if (leather) {

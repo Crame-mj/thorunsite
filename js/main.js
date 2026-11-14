@@ -62,6 +62,7 @@ await Promise.race([
   Promise.all([
     document.fonts.load('400 32px "Noto Serif KR"', '가A'),
     document.fonts.load('700 32px "Noto Serif KR"', '가A'),
+    document.fonts.load('700 32px "Lobster Two"', 'Lexicon'),
   ]).catch(() => {}),
   new Promise((r) => setTimeout(r, 2500)),
 ]);

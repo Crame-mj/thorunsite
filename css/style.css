@@ -1,3 +1,12 @@
+/* 표지 'Lexicon' 글자용 폰트 (SIL OFL, assets/fonts/LobsterTwo-OFL.txt) */
+@font-face {
+  font-family: 'Lobster Two';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('../assets/fonts/lobster-two-latin-700-normal.woff2') format('woff2');
+}
+
 :root {
   --bg: #0b0e17;
   --fg: #e9e4d8;
