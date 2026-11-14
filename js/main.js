@@ -144,16 +144,18 @@ function setPopupImage(src, alt) {
 function showDescription(c, region) {
   const regionImage = region && region.image;
   if (c.image) {
-    if (regionImage) setPopupImage(region.image, `${displayName(region)} 이미지`);
+    if (regionImage) setPopupImage(region.image, `${region.name ? displayName(region) : displayName(c)} ${region.label ?? ''} 이미지`.replace(/\s+/g, ' '));
     else if (!region) setPopupImage(c.image, `${displayName(c)} 이미지`);
   }
   popupPins.classList.toggle('pins-hidden', Boolean(regionImage));
-  const text = region ? region.description : c.description;
+  // 구역 설명이 비어 있으면 대륙 설명을 그대로 보여준다 (이미지만 바꾸는 핀)
+  const text = region && region.description ? region.description : c.description;
   const hasDesc = Boolean(text && text.trim());
   popupDesc.textContent = hasDesc ? text : '설명 준비 중';
   popupDesc.classList.toggle('empty', !hasDesc);
-  popupSubtitle.hidden = !region;
-  popupSubtitle.textContent = region ? displayName(region) : '';
+  const showSub = Boolean(region && region.name);
+  popupSubtitle.hidden = !showSub;
+  popupSubtitle.textContent = showSub ? displayName(region) : '';
   popupDesc.parentElement.scrollTop = 0;
   for (const pin of popupPins.children) {
     const active = region ? pin.dataset.region === region.id : pin.dataset.region === '';
@@ -198,7 +200,7 @@ function openPopup(id) {
     home.addEventListener('click', () => showDescription(c, null));
     popupPins.append(home);
     for (const r of regions) {
-      const pin = makePin(displayName(r), r.id, r.x, r.y, false);
+      const pin = makePin(r.name ? displayName(r) : (r.label ?? ''), r.id, r.x, r.y, false);
       pin.addEventListener('click', () => showDescription(c, r));
       popupPins.append(pin);
     }

@@ -6,9 +6,20 @@
 // regions: 팝업 이미지 위 구역(국가) 핀. 누르면 왼쪽 이미지와 오른쪽 설명이 그 구역 것으로 바뀐다.
 //   x, y: 대륙 이미지 안 핀 위치(왼쪽 위 기준 %, 0~100). name/nameEn: 구역 이름(한글/영문).
 //   image: 구역 이미지 경로 (없으면 대륙 이미지 유지). description: 구역 설명.
+//   name 없이 label만 있는 항목은 이미지만 바꾸는 핀이다 (설명은 대륙 설명 유지, 구역 이름 표시 없음).
 export const CONTINENTS = [
-  { id: 'arkeh', name: '아르케', nameEn: 'Arkeh', lat: 75.0, lon: -140.0, image: 'assets/continents/arkeh.webp', description: '' },
-  { id: 'ashadon', name: '아샤돈', nameEn: 'Ashadon', lat: 37.1, lon: -104.4, image: 'assets/continents/ashadon.webp', description: '' },
+  { id: 'arkeh', name: '아르케', nameEn: 'Arkeh', lat: 75.0, lon: -140.0, image: 'assets/continents/arkeh.webp',
+    description: '아르케는 부유 대륙으로, 강력한 신성력에 의해 항상 하늘을 날고 있다. 아르케의 전 지역은 신성한 기운으로 가득하며, 기본적으로 천사만 거주할 수 있다. 부유 대륙인 만큼 그때그때 위치가 바뀌기 때문에 천사가 아니라면 정확한 위치를 찾기 어렵다. 7인의 대천사가 대륙 전체를 함께 다스리고 있다.',
+    regions: [
+      { id: 'city', label: '도시 풍경', x: 50.2, y: 44.7, image: 'assets/regions/arkeh/city.webp', description: '' },
+    ],
+  },
+  { id: 'ashadon', name: '아샤돈', nameEn: 'Ashadon', lat: 37.1, lon: -104.4, image: 'assets/continents/ashadon.webp',
+    description: '아샤돈은 라니엘과 알카란 사이에 위치한 악마들의 대륙이다. 상위 세 종족의 대륙 중 유일하게 위치도 명확히 알려져 있고 타 종족의 접근도 막지 않으나, 이곳의 환경은 혼돈 그 자체이기에 사실상 악마가 아니면 살아남을 수 없다. 72인의 대악마가 각자 대륙의 일정 구역을 차지하고 끊임없이 경쟁하고 있으며, 지배자의 성향에 따라 각 지역의 환경은 천차만별이다.',
+    regions: [
+      { id: 'city', label: '도시 풍경', x: 50.2, y: 48.0, image: 'assets/regions/ashadon/city.webp', description: '' },
+    ],
+  },
   { id: 'laniel', name: '라니엘', nameEn: 'Laniel', lat: 42.5, lon: -22.8, image: 'assets/continents/laniel.webp',
     description: '라니엘은 인간, 엘프, 드워프를 비롯한 다양한 종족이 어우러져 살아가는 대륙이다. 드넓은 평야, 깊은 숲과 축축한 늪, 험준한 산지와 협곡까지 다채로운 환경이 특징이다. 주 종족은 인간, 엘프, 드워프, 오크이며 다수의 대륙을 주변에 끼고 있어 주요 무역로 역할을 하는 만큼 많은 종족들을 만나볼 수 있다.',
     regions: [
@@ -129,6 +140,16 @@ export const CONTINENTS = [
       },
     ],
   },
-  { id: 'yidra', name: '이드라', nameEn: 'Yidra', lat: -22.4, lon: 28.3, image: 'assets/continents/yidra.webp', description: '' },
-  { id: 'yumir', name: '유미르', nameEn: 'Yumir', lat: -88.0, lon: 0.0, image: 'assets/continents/yumir.webp', description: '' },
+  { id: 'yidra', name: '이드라', nameEn: 'Yidra', lat: -22.4, lon: 28.3, image: 'assets/continents/yidra.webp',
+    description: '이드라는 요정들의 대륙으로 알려진 곳으로, 강력한 영력으로 보호되고 있어 외부에서 쉽게 접근할 수 없고, 허락되지 않은 이들은 그 위치조차 제대로 인지하지 못한다. 외부에 알려진 정보는 대륙 전체가 영력이 흘러넘치는 아름다운 몽환의 숲이며, 요정과 정령들이 어우러져 살아가고 있다는 것 정도 뿐이다.',
+    regions: [
+      { id: 'city', label: '도시 풍경', x: 50.6, y: 43.9, image: 'assets/regions/yidra/city.webp', description: '' },
+    ],
+  },
+  { id: 'yumir', name: '유미르', nameEn: 'Yumir', lat: -88.0, lon: 0.0, image: 'assets/continents/yumir.webp',
+    description: '유미르는 남극에 위치한 드넓은 설원 대륙이다. 사계절 내내 눈과 얼음에 덮여있으며, 너무나 추운 날씨 탓에 생명체가 거의 살지 않는다. 그러나 이곳에도 거주민들이 존재하며, 이곳에 사는 사람들은 건축 자재를 구하기 어렵기 때문에 동물의 뼈와 가죽으로 천막을 치고 살거나 얼음으로 집을 짓는다. 제대로 된 항구가 없기에 당연히 교역도 거의 이루어지지 않으며, 자연스레 유미르는 타 대륙과는 다른 독특한 문화를 형성하게 되었다. 식물이 거의 없어 거주민들은 수렵을 통한 육식 위주 식생활을 가졌다.',
+    regions: [
+      { id: 'city', label: '도시 풍경', x: 51.2, y: 41.6, image: 'assets/regions/yumir/city.webp', description: '' },
+    ],
+  },
 ];
