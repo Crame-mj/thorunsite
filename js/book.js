@@ -640,7 +640,7 @@ function drawImageCover(g, img, x, y, w, h) {
 // 금박에 가죽 결을 입히는 강도
 const GRAIN_STRENGTH = 3.2;  // 가죽 요철을 금박 밝기에 반영하는 정도 (클수록 결이 뚜렷)
 const GRAIN_WEAR = 2.2;      // 가죽의 패인 부분에서 금박이 벗겨진 듯 비치는 정도
-const GOLD_DIM = 0.82;       // 금박 전체 밝기 (1이면 원래 색)
+const GOLD_DIM = 0.62;       // 금박 전체 밝기 (1이면 원래 색)
 
 /**
  * 금박 레이어에 가죽 텍스처의 요철(밝기의 고주파 성분)을 입힌다.
