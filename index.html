@@ -37,11 +37,15 @@
     <section class="popup-panel" role="dialog" aria-modal="true" aria-labelledby="popup-title">
       <button class="popup-close" type="button" aria-label="닫기" data-close>&times;</button>
       <div class="popup-media">
-        <img id="popup-image" alt="" hidden>
+        <div id="popup-figure" class="popup-figure" hidden>
+          <img id="popup-image" alt="">
+          <div id="popup-pins" class="popup-pins"></div>
+        </div>
         <div id="popup-image-empty" class="popup-empty">이미지 준비 중</div>
       </div>
       <div class="popup-body">
         <h2 id="popup-title"></h2>
+        <h3 id="popup-subtitle" class="popup-subtitle" hidden></h3>
         <div id="popup-desc" class="popup-desc"></div>
       </div>
     </section>

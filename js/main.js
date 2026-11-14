@@ -28,6 +28,9 @@ const popupTitle = document.getElementById('popup-title');
 const popupDesc = document.getElementById('popup-desc');
 const popupImage = document.getElementById('popup-image');
 const popupImageEmpty = document.getElementById('popup-image-empty');
+const popupFigure = document.getElementById('popup-figure');
+const popupPins = document.getElementById('popup-pins');
+const popupSubtitle = document.getElementById('popup-subtitle');
 
 let renderer;
 try {
@@ -132,23 +135,64 @@ function focusContinent(id) {
   globe.focusOn(id, () => openPopup(id));
 }
 
+/** 오른쪽 설명 칸을 대륙 설명(region=null) 또는 구역 설명으로 채운다 */
+function showDescription(c, region) {
+  const text = region ? region.description : c.description;
+  const hasDesc = Boolean(text && text.trim());
+  popupDesc.textContent = hasDesc ? text : '설명 준비 중';
+  popupDesc.classList.toggle('empty', !hasDesc);
+  popupSubtitle.hidden = !region;
+  popupSubtitle.textContent = region ? region.name : '';
+  popupDesc.parentElement.scrollTop = 0;
+  for (const pin of popupPins.children) {
+    const active = region ? pin.dataset.region === region.id : pin.dataset.region === '';
+    pin.classList.toggle('active', active);
+    pin.setAttribute('aria-pressed', String(active));
+  }
+}
+
+function makePin(label, regionId, x, y, isHome) {
+  const pin = document.createElement('button');
+  pin.type = 'button';
+  pin.className = isHome ? 'region-pin home' : 'region-pin';
+  pin.dataset.region = regionId;
+  pin.style.left = `${x}%`;
+  pin.style.top = `${y}%`;
+  pin.setAttribute('aria-label', label);
+  pin.title = label;
+  if (isHome) pin.innerHTML = '<span class="label">대륙 개요</span>';
+  return pin;
+}
+
 function openPopup(id) {
   const c = CONTINENTS.find((x) => x.id === id);
   if (!c) return;
   popupTitle.textContent = displayName(c);
-  const hasDesc = Boolean(c.description && c.description.trim());
-  popupDesc.textContent = hasDesc ? c.description : '설명 준비 중';
-  popupDesc.classList.toggle('empty', !hasDesc);
   if (c.image) {
     popupImage.src = c.image;
     popupImage.alt = `${displayName(c)} 이미지`;
-    popupImage.hidden = false;
+    popupFigure.hidden = false;
     popupImageEmpty.hidden = true;
   } else {
     popupImage.removeAttribute('src');
-    popupImage.hidden = true;
+    popupFigure.hidden = true;
     popupImageEmpty.hidden = false;
   }
+
+  // 구역 핀: 구역이 있는 대륙만. 왼쪽 위 핀은 대륙 설명으로 돌아가는 용도.
+  popupPins.replaceChildren();
+  const regions = c.image && c.regions ? c.regions : [];
+  if (regions.length) {
+    const home = makePin('대륙 개요', '', 0, 0, true);
+    home.addEventListener('click', () => showDescription(c, null));
+    popupPins.append(home);
+    for (const r of regions) {
+      const pin = makePin(r.name, r.id, r.x, r.y, false);
+      pin.addEventListener('click', () => showDescription(c, r));
+      popupPins.append(pin);
+    }
+  }
+  showDescription(c, null);
   popupReturnFocus = document.activeElement;
   popup.hidden = false;
   requestAnimationFrame(() => popup.classList.add('open'));
