@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Globe } from './globe.js';
 import { Book } from './book.js';
-import { PEOPLE, BOOK_TITLE } from './people.js';
+import { PEOPLE, BOOK_TITLE, COVER_TITLE } from './people.js';
 import { CONTINENTS } from './continents.js';
 
 // 지구본 텍스처: 등장방형(equirectangular) 2:1 이미지
@@ -67,7 +67,7 @@ await Promise.race([
 ]);
 
 const book = await Book.create({
-  renderer, pageWidth: 1.3, pageHeight: 1.8, people: PEOPLE, title: BOOK_TITLE, textures: BOOK_TEXTURES,
+  renderer, pageWidth: 1.3, pageHeight: 1.8, people: PEOPLE, title: BOOK_TITLE, coverTitle: COVER_TITLE, textures: BOOK_TEXTURES,
 });
 scene.add(book.object);
 

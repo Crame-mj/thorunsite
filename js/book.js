@@ -49,7 +49,7 @@ export class Book {
     return new Book(opts, portraits, { cover, paper, edge });
   }
 
-  constructor({ renderer, pageWidth = 1.3, pageHeight = 1.8, people = [], title = '개념서', perPage = 2 }, portraits = new Map(), images = {}) {
+  constructor({ renderer, pageWidth = 1.3, pageHeight = 1.8, people = [], title = '개념서', coverTitle = title, perPage = 2 }, portraits = new Map(), images = {}) {
     this.W = pageWidth;                    // 종이 더미 전체 폭 (경사면 포함)
     this.Wp = pageWidth - FORE_SLOPE;      // 윗면(내용이 보이는 페이지) 폭
     this.H = pageHeight;
@@ -60,6 +60,7 @@ export class Book {
     this.portraits = portraits;
     this.images = images;
     this.title = title;
+    this.coverTitle = coverTitle; // 표지에 금박으로 찍히는 글자 (첫 장 제목과 별도)
 
     const pages = [{ type: 'title', title }];
     for (let i = 0; i < people.length; i += perPage) {
@@ -118,7 +119,7 @@ export class Book {
       color: leather ? 0xffffff : CLOTH, map: leather, roughness: 0.75, side: THREE.DoubleSide,
     });
     // 앞표지는 거울 배치 후 뒤집혀서 보이므로 UV를 좌우 반전
-    const coverTex = this._canvasTex(this.Wc / this.Hc, (g, w, h) => drawCover(g, w, h, this.title, this.images.cover));
+    const coverTex = this._canvasTex(this.Wc / this.Hc, (g, w, h) => drawCover(g, w, h, this.coverTitle, this.images.cover));
     coverTex.repeat.x = -1;
     coverTex.offset.x = 1;
     this.coverArtMat = new THREE.MeshStandardMaterial({ map: coverTex, roughness: 0.7 });
@@ -645,17 +646,48 @@ function drawCover(g, w, h, title, leather) {
     g.fillStyle = grad;
     g.fillRect(0, 0, w, h);
   }
+  // 금박(테두리 + 제목)은 별도 레이어에 그린 뒤 가죽 결을 입혀서 표지에 눌러 찍은 것처럼 합성한다.
+  const layer = document.createElement('canvas');
+  layer.width = w; layer.height = h;
+  const L = layer.getContext('2d');
+  const gold = L.createLinearGradient(0, 0, w, h);
+  gold.addColorStop(0, '#e2c47e');
+  gold.addColorStop(0.5, '#c9a35a');
+  gold.addColorStop(1, '#b8914c');
+  L.strokeStyle = gold;
+  L.fillStyle = gold;
   const m = w * 0.07;
-  g.strokeStyle = '#c9a964';
-  g.lineWidth = 6;
-  g.strokeRect(m, m, w - m * 2, h - m * 2);
-  g.lineWidth = 2;
-  g.strokeRect(m * 1.4, m * 1.4, w - m * 2.8, h - m * 2.8);
-  g.fillStyle = '#d9bc78';
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.font = `700 ${Math.round(w * 0.1)}px ${FONT}`;
-  g.fillText(title, w / 2, h * 0.4);
+  L.lineWidth = 6;
+  L.strokeRect(m, m, w - m * 2, h - m * 2);
+  L.lineWidth = 2;
+  L.strokeRect(m * 1.4, m * 1.4, w - m * 2.8, h - m * 2.8);
+  L.textAlign = 'center';
+  L.textBaseline = 'middle';
+  L.font = `700 ${Math.round(w * 0.125)}px ${FONT}`;
+  L.fillText(title, w / 2, h * 0.4);
+
+  if (leather) {
+    // 금박 모양만 남겨 두고(mask), 그 위에 가죽 결을 곱하기로 얹은 뒤 다시 금박 모양으로 잘라낸다
+    const mask = document.createElement('canvas');
+    mask.width = w; mask.height = h;
+    mask.getContext('2d').drawImage(layer, 0, 0);
+    L.globalCompositeOperation = 'multiply';
+    L.globalAlpha = 0.22;
+    drawImageCover(L, leather, 0, 0, w, h);
+    L.globalCompositeOperation = 'destination-in';
+    L.globalAlpha = 1;
+    L.drawImage(mask, 0, 0);
+  }
+
+  // 약간 반투명하게 + 아래쪽에 옅은 그림자를 줘서 가죽에 눌러 찍힌 느낌
+  g.save();
+  g.globalAlpha = 0.93;
+  g.shadowColor = 'rgba(0, 0, 0, 0.45)';
+  g.shadowOffsetX = 1.5;
+  g.shadowOffsetY = 2;
+  g.shadowBlur = 3;
+  g.drawImage(layer, 0, 0);
+  g.restore();
 }
 
 function drawPage(g, w, h, page, side, pageNo, portraits, paper) {
