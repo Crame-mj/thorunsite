@@ -117,6 +117,16 @@ export const CONTINENTS = [
         image: 'assets/regions/eremos/tangloot.webp',
         description: '에레모스 중심부에 위치한 우거진 수림이다. 외신 엘레라그실이 지배하고 있다. 이곳의 거주민들은 엘레라그실의 열매를 먹고 불멸이 되었는데, 이 불멸의 방식이 단순히 육체와 영혼을 강제로 묶는 것일 뿐이었기에, 열매를 먹은 이들은 살이 썩는 고통을 모두 느끼며 점차 이성을 놓고 마물 스켈레톤이 되어가고 있다.',
       },
+      {
+        id: 'eutopos', name: '유토포스', nameEn: 'Eutopos', x: 79.4, y: 45.3,
+        image: 'assets/regions/eremos/eutopos.webp',
+        description: '에레모스 동부에 위치한 평야지대이다. 큰 강이 흐르고 비옥한 토양을 가져 원래는 농경이 발달한 국가였으나, 이제 그 풍족한 작물들은 거주민들의 마음과 함께 모조리 말라붙었다. 외신 네프라티스가 주민들의 감정을 모조리 흡수하는 바람에 대다수는 마물 허스크가 되었으며, 아직 남아있는 주민들도 대체로 무감정한 모습을 보인다.',
+      },
+      {
+        id: 'tiabay', name: '티아배이', nameEn: 'Tiabay', x: 77.2, y: 67.4,
+        image: 'assets/regions/eremos/tiabay.webp',
+        description: '에레모스 남동부에 위치한 드넓은 평야지대이다. 본래 아름다운 해안 풍경을 가져 관광지로 유명했으며, 농업과 어업이 모두 발달한 풍족한 나라였다. 지금은 외신 해그니어에 의해 마물 비게터로 변해버린 대부분의 거주민과, 그들의 눈을 피해 다니는 일부 생존자들의 숨 막히는 숨바꼭질만이 이어지고 있다.',
+      },
     ],
   },
   { id: 'yidra', name: '이드라', nameEn: 'Yidra', lat: -22.4, lon: 28.3, image: 'assets/continents/yidra.webp', description: '' },
