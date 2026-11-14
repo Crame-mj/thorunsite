@@ -3,6 +3,7 @@ import { Globe } from './globe.js';
 import { Book } from './book.js';
 import { PEOPLE, BOOK_TITLE, COVER_TITLE } from './people.js';
 import { CONTINENTS } from './continents.js';
+import { setupAudioPlayer } from './audio-player.js';
 
 // 지구본 텍스처: 등장방형(equirectangular) 2:1 이미지
 // world-map-globe.webp는 원본(world-map.webp)을 극지방 왜곡이 덜하도록 재투영한 버전
@@ -23,6 +24,8 @@ const btnToGlobe = document.getElementById('to-globe');
 const loading = document.getElementById('loading');
 const bgVideo = document.getElementById('bg');
 const continentList = document.getElementById('continent-list');
+document.body.dataset.mode = 'globe';
+setupAudioPlayer(document.getElementById('audio-player'));
 const popup = document.getElementById('continent-popup');
 const popupTitle = document.getElementById('popup-title');
 const popupDesc = document.getElementById('popup-desc');
@@ -102,6 +105,7 @@ const state = { mode: 'globe', t: 0, zoom: 0, zoomTarget: 0 };
 
 function setMode(mode) {
   state.mode = mode;
+  document.body.dataset.mode = mode; // 오디오 플레이어 위치 이동(CSS)
   state.zoomTarget = 0;
   btnToBook.hidden = mode !== 'globe';
   btnToGlobe.hidden = mode !== 'book';
@@ -307,6 +311,8 @@ canvas.addEventListener('pointercancel', endDrag);
 
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') { closePopup(); return; }
+  // 볼륨 슬라이더 등 입력 요소에서 누른 방향키로 책장이 넘어가지 않도록
+  if (e.target.closest?.('input, select, textarea, .audio-player')) return;
   if (activeController() !== 'book') return;
   if (e.key === 'ArrowRight') book.next();
   else if (e.key === 'ArrowLeft') book.prev();

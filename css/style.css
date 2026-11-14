@@ -360,3 +360,142 @@ html, body {
 @media (prefers-reduced-motion: reduce) {
   .popup-backdrop, .popup-panel { transition: none; }
 }
+
+/* ------------------------------------------------------------ 배경음악 플레이어 */
+
+.audio-player {
+  --ap-gap: max(16px, env(safe-area-inset-left));
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: var(--ap-gap);
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px 5px 6px;
+  color: var(--fg);
+  background: rgba(10, 12, 20, 0.55);
+  border: 1px solid var(--btn-border);
+  border-radius: 999px;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  /* 지구본 화면: 오른쪽 끝으로 밀어 우상단에. 개념서 화면: 원래 자리(좌상단). 화면 전환 시간과 맞춤 */
+  transform: translateX(calc(100vw - 100% - var(--ap-gap) * 2));
+  transition: transform 1.1s cubic-bezier(0.65, 0, 0.35, 1);
+}
+body[data-mode="book"] .audio-player { transform: none; }
+
+.ap-btn {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  opacity: 0.75;
+  transition: background 0.2s, opacity 0.2s, color 0.2s;
+}
+.ap-btn svg { width: 17px; height: 17px; fill: currentColor; }
+.ap-btn:hover, .ap-btn:focus-visible { background: var(--btn-bg-hover); opacity: 1; }
+.ap-btn:focus-visible, .ap-track:focus-visible, .ap-volume:focus-visible { outline: 2px solid var(--fg); outline-offset: 1px; }
+/* 현재 상태 표시: 재생 중이면 재생 버튼, 일시정지면 일시정지 버튼을 금색으로 */
+.audio-player[data-status="playing"] [data-action="play"],
+.audio-player[data-status="paused"] [data-action="pause"] { color: #e8c46a; opacity: 1; }
+
+.ap-track-wrap { position: relative; margin: 0 6px 0 4px; }
+.ap-track {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  width: 190px; /* 곡이 바뀌어도 플레이어 폭이 흔들리지 않도록 고정 */
+  justify-content: space-between;
+  padding: 4px 4px 4px 8px;
+  font: inherit;
+  font-size: 0.85rem;
+  color: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.ap-track:hover, .ap-track[aria-expanded="true"] { border-color: var(--btn-border); background: var(--btn-bg); }
+.ap-track-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ap-caret { width: 16px; height: 16px; fill: currentColor; flex: none; transition: transform 0.2s; }
+.ap-track[aria-expanded="true"] .ap-caret { transform: rotate(180deg); }
+
+.ap-list {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 240px;
+  max-height: min(60vh, 360px);
+  overflow-y: auto;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: rgba(16, 15, 20, 0.95);
+  border: 1px solid var(--btn-border);
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+.ap-list[hidden] { display: none; }
+/* 지구본 화면(우상단)에서는 목록이 화면 밖으로 나가지 않게 오른쪽 기준으로 펼친다 */
+body:not([data-mode="book"]) .ap-list { left: auto; right: 0; }
+.ap-list li {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+}
+.ap-list li:hover, .ap-list li:focus-visible { background: var(--btn-bg-hover); }
+.ap-list li.current .ap-list-title { color: #e8c46a; }
+.ap-list-title { font-size: 0.9rem; }
+.ap-list-theme { font-size: 0.72rem; opacity: 0.55; }
+
+.ap-volume {
+  --fill: 50%;
+  width: 90px;
+  height: 18px;
+  margin: 0;
+  background: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.ap-volume::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(to right, #e8c46a var(--fill), rgba(233, 228, 216, 0.25) var(--fill));
+}
+.ap-volume::-moz-range-track { height: 4px; border-radius: 2px; background: rgba(233, 228, 216, 0.25); }
+.ap-volume::-moz-range-progress { height: 4px; border-radius: 2px; background: #e8c46a; }
+.ap-volume::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 13px;
+  height: 13px;
+  margin-top: -4.5px;
+  border-radius: 50%;
+  background: var(--fg);
+  border: none;
+}
+.ap-volume::-moz-range-thumb { width: 13px; height: 13px; border-radius: 50%; background: var(--fg); border: none; }
+
+@media (max-width: 600px) {
+  .audio-player { --ap-gap: 10px; top: max(10px, env(safe-area-inset-top)); padding: 3px 10px 3px 4px; gap: 0; }
+  .ap-btn { width: 28px; height: 28px; }
+  .ap-track { width: 110px; font-size: 0.78rem; }
+  .ap-volume { width: 64px; }
+  /* 폰에서는 대륙 목록 줄을 플레이어 아래로 내린다 */
+  .continent-list { top: calc(max(10px, env(safe-area-inset-top)) + 50px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .audio-player { transition: none; }
+}

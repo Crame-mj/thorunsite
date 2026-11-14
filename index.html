@@ -28,6 +28,27 @@
     <span class="arrow" aria-hidden="true">&lsaquo;</span><span>세계</span>
   </button>
 
+  <!-- 배경음악 플레이어: 지구본 화면에선 우상단, 개념서 화면에선 좌상단 (body[data-mode]로 이동) -->
+  <div id="audio-player" class="audio-player" data-status="stopped">
+    <button type="button" class="ap-btn" data-action="play" aria-label="재생" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l11-6.5z"/></svg>
+    </button>
+    <button type="button" class="ap-btn" data-action="pause" aria-label="일시 정지" aria-pressed="false">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z"/></svg>
+    </button>
+    <button type="button" class="ap-btn" data-action="stop" aria-label="정지">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 6.5h11v11h-11z"/></svg>
+    </button>
+    <div class="ap-track-wrap">
+      <button type="button" class="ap-track" aria-haspopup="listbox" aria-expanded="false" aria-label="곡 목록">
+        <span class="ap-track-name"></span>
+        <svg class="ap-caret" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 10l5 5 5-5z"/></svg>
+      </button>
+      <ul class="ap-list" role="listbox" aria-label="곡 목록" hidden></ul>
+    </div>
+    <input class="ap-volume" type="range" min="0" max="1" step="0.01" aria-label="볼륨">
+  </div>
+
   <!-- 대륙 바로가기 (지구본 화면에서만 표시) -->
   <nav id="continent-list" class="continent-list" aria-label="대륙 목록"></nav>
 
