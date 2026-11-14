@@ -288,6 +288,8 @@ html, body {
   color: #e8c46a;
 }
 .popup-subtitle[hidden] { display: none; }
+/* 구역 이미지를 보는 동안에는 구역 핀을 숨기고 '대륙 개요'만 남긴다 */
+.popup-pins.pins-hidden .region-pin:not(.home) { display: none; }
 .popup-empty, .popup-desc.empty {
   color: rgba(233, 228, 216, 0.4);
   font-size: 0.9rem;
