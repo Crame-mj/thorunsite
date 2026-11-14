@@ -122,6 +122,8 @@ function applyLayout() {
 
 let popupReturnFocus = null;
 
+const displayName = (c) => (c.nameEn ? `${c.name}(${c.nameEn})` : c.name);
+
 function focusContinent(id) {
   if (activeController() !== 'globe' || globe.isFocusing || !popup.hidden) return;
   state.zoomTarget = 1;
@@ -131,13 +133,13 @@ function focusContinent(id) {
 function openPopup(id) {
   const c = CONTINENTS.find((x) => x.id === id);
   if (!c) return;
-  popupTitle.textContent = c.name;
+  popupTitle.textContent = displayName(c);
   const hasDesc = Boolean(c.description && c.description.trim());
   popupDesc.textContent = hasDesc ? c.description : '설명 준비 중';
   popupDesc.classList.toggle('empty', !hasDesc);
   if (c.image) {
     popupImage.src = c.image;
-    popupImage.alt = `${c.name} 이미지`;
+    popupImage.alt = `${displayName(c)} 이미지`;
     popupImage.hidden = false;
     popupImageEmpty.hidden = true;
   } else {
@@ -170,7 +172,7 @@ for (const c of CONTINENTS) {
   btn.type = 'button';
   btn.className = 'continent-btn';
   btn.innerHTML = '<span class="dot" aria-hidden="true"></span>';
-  btn.append(document.createTextNode(c.name));
+  btn.append(document.createTextNode(displayName(c)));
   btn.addEventListener('click', () => focusContinent(c.id));
   continentList.append(btn);
 }
