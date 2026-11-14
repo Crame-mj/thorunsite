@@ -7,9 +7,9 @@ export const CONTINENTS = [
   { id: 'arkeh', name: '아르케', nameEn: 'Arkeh', lat: 75.0, lon: -140.0, image: 'assets/continents/arkeh.webp', description: '' },
   { id: 'ashadon', name: '아샤돈', nameEn: 'Ashadon', lat: 37.1, lon: -104.4, image: 'assets/continents/ashadon.webp', description: '' },
   { id: 'laniel', name: '라니엘', nameEn: 'Laniel', lat: 42.5, lon: -22.8, image: 'assets/continents/laniel.webp', description: '' },
-  { id: 'soran', name: '소란', nameEn: 'Soran', lat: 22.8, lon: 105.9, image: null, description: '' },
+  { id: 'soran', name: '소란', nameEn: 'Soran', lat: 22.8, lon: 105.9, image: 'assets/continents/soran.webp', description: '' },
   { id: 'alkahran', name: '알카란', nameEn: 'Alkahran', lat: -18.6, lon: -124.9, image: 'assets/continents/alkahran.webp', description: '' },
   { id: 'eremos', name: '에레모스', nameEn: 'Eremos', lat: -34.4, lon: -36.0, image: 'assets/continents/eremos.webp', description: '' },
-  { id: 'yidra', name: '이드라', nameEn: 'Yidra', lat: -22.4, lon: 28.3, image: null, description: '' },
-  { id: 'yumir', name: '유미르', nameEn: 'Yumir', lat: -88.0, lon: 0.0, image: null, description: '' },
+  { id: 'yidra', name: '이드라', nameEn: 'Yidra', lat: -22.4, lon: 28.3, image: 'assets/continents/yidra.webp', description: '' },
+  { id: 'yumir', name: '유미르', nameEn: 'Yumir', lat: -88.0, lon: 0.0, image: 'assets/continents/yumir.webp', description: '' },
 ];
