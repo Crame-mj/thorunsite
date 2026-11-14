@@ -637,6 +637,49 @@ function drawImageCover(g, img, x, y, w, h) {
   g.drawImage(img, (iw - sw) / 2, (ih - sh) / 2, sw, sh, x, y, w, h);
 }
 
+// 금박에 가죽 결을 입히는 강도
+const GRAIN_STRENGTH = 3.2;  // 가죽 요철을 금박 밝기에 반영하는 정도 (클수록 결이 뚜렷)
+const GRAIN_WEAR = 2.2;      // 가죽의 패인 부분에서 금박이 벗겨진 듯 비치는 정도
+const GOLD_DIM = 0.82;       // 금박 전체 밝기 (1이면 원래 색)
+
+/**
+ * 금박 레이어에 가죽 텍스처의 요철(밝기의 고주파 성분)을 입힌다.
+ * 가죽이 튀어나온 곳은 금박이 밝게, 패인 곳은 어둡고 일부 투명해져서
+ * 가죽 위에 금박을 눌러 찍은 것처럼 결이 드러난다.
+ */
+function applyLeatherGrain(layer, leather) {
+  const w = layer.width, h = layer.height;
+  const src = document.createElement('canvas');
+  src.width = w; src.height = h;
+  const S = src.getContext('2d');
+  drawImageCover(S, leather, 0, 0, w, h);
+  // 저주파(평균 밝기): 작게 줄였다가 다시 키워서 흐린 버전을 만든다
+  const blur = document.createElement('canvas');
+  blur.width = w; blur.height = h;
+  const B = blur.getContext('2d');
+  B.imageSmoothingQuality = 'high';
+  B.drawImage(src, 0, 0, Math.max(1, w >> 4), Math.max(1, h >> 4));
+  B.drawImage(blur, 0, 0, Math.max(1, w >> 4), Math.max(1, h >> 4), 0, 0, w, h);
+
+  const lp = S.getImageData(0, 0, w, h).data;
+  const bp = B.getImageData(0, 0, w, h).data;
+  const Lctx = layer.getContext('2d');
+  const img = Lctx.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    const lum = lp[i] * 0.299 + lp[i + 1] * 0.587 + lp[i + 2] * 0.114;
+    const mean = bp[i] * 0.299 + bp[i + 1] * 0.587 + bp[i + 2] * 0.114 + 1;
+    const detail = (lum - mean) / mean; // 대략 -0.3 ~ 0.3
+    const k = Math.max(0.25, GOLD_DIM * (1 + GRAIN_STRENGTH * detail));
+    d[i] = Math.min(255, d[i] * k);
+    d[i + 1] = Math.min(255, d[i + 1] * k);
+    d[i + 2] = Math.min(255, d[i + 2] * k);
+    d[i + 3] = d[i + 3] * Math.min(1, Math.max(0.35, 1 + GRAIN_WEAR * detail));
+  }
+  Lctx.putImageData(img, 0, 0);
+}
+
 function drawCover(g, w, h, title, leather) {
   if (leather) {
     drawImageCover(g, leather, 0, 0, w, h);
@@ -667,18 +710,7 @@ function drawCover(g, w, h, title, leather) {
   L.font = `700 ${Math.round(w * 0.23)}px ${COVER_FONT}`;
   L.fillText(title, w / 2, h * 0.4);
 
-  if (leather) {
-    // 금박 모양만 남겨 두고(mask), 그 위에 가죽 결을 곱하기로 얹은 뒤 다시 금박 모양으로 잘라낸다
-    const mask = document.createElement('canvas');
-    mask.width = w; mask.height = h;
-    mask.getContext('2d').drawImage(layer, 0, 0);
-    L.globalCompositeOperation = 'multiply';
-    L.globalAlpha = 0.22;
-    drawImageCover(L, leather, 0, 0, w, h);
-    L.globalCompositeOperation = 'destination-in';
-    L.globalAlpha = 1;
-    L.drawImage(mask, 0, 0);
-  }
+  if (leather) applyLeatherGrain(layer, leather);
 
   // 약간 반투명하게 + 아래쪽에 옅은 그림자를 줘서 가죽에 눌러 찍힌 느낌
   g.save();
