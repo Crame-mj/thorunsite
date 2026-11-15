@@ -61,13 +61,16 @@ globe.addPins(CONTINENTS);
 scene.add(globe.object);
 
 // 캔버스 텍스트에 웹폰트를 쓰려면 폰트가 먼저 로드돼야 한다. 실패/지연 시 기본 serif로 진행.
+// 개념서 내부 글씨(Nanum Pen Script)는 글자 범위별 파일로 나뉘어 있어서, 책에 쓰이는 글자를 넘겨 해당 파일만 미리 받는다.
+const BOOK_TEXT = `${BOOK_TITLE}0123456789${JSON.stringify(PEOPLE)}`;
 await Promise.race([
   Promise.all([
+    document.fonts.load('400 32px "Nanum Pen Script"', BOOK_TEXT),
     document.fonts.load('400 32px "Noto Serif KR"', '가A'),
     document.fonts.load('700 32px "Noto Serif KR"', '가A'),
     document.fonts.load('700 32px "Lobster Two"', 'Lexicon'),
   ]).catch(() => {}),
-  new Promise((r) => setTimeout(r, 2500)),
+  new Promise((r) => setTimeout(r, 4000)),
 ]);
 
 const book = await Book.create({

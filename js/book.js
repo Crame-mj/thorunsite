@@ -11,7 +11,9 @@ const EDGE_PERIOD = 0.03;    // 종이 단면 줄무늬 텍스처 한 주기의 
 const TEX_W = 1024;          // 페이지 텍스처 가로 해상도
 const TEX_CACHE = 10;        // 메모리에 유지할 페이지 텍스처 수
 const PAPER = '#f3ecdc';
-const INK = '#2b241b';
+const INK = '#3d2a1a';          // 개념서 내부 글씨: 검정 대신 바랜 고동색 잉크
+const INK_SOFT = 'rgba(61, 42, 26, 0.7)';
+const INK_FADE = 'rgba(61, 42, 26, 0.55)';
 const CLOTH = '#3b2119';
 
 /**
@@ -607,6 +609,7 @@ function easeInOut(x) { return x * x * (3 - 2 * x); }
 // ==================================================================== 텍스처 그리기
 
 const FONT = '"Noto Serif KR", serif';
+const BOOK_FONT = '"Nanum Pen Script", "Noto Serif KR", cursive'; // 개념서 내부 글씨 (표지 제외)
 const COVER_FONT = '"Lobster Two", "Noto Serif KR", serif'; // 표지 제목 전용
 
 function createEdgeTexture() {
@@ -747,72 +750,137 @@ function drawPage(g, w, h, page, side, pageNo, portraits, paper) {
 
   if (page.type === 'blank') return;
 
+  // 글씨와 선은 별도의 '잉크' 레이어에 그린 뒤, 종이 결과 얼룩을 입혀 종이에 스며든 것처럼 합성한다.
+  // (초상화 이미지는 잉크가 아니므로 종이에 바로 그린다)
+  const ink = document.createElement('canvas');
+  ink.width = w; ink.height = h;
+  const L = ink.getContext('2d');
+
   const pad = w * 0.11;
   const gutter = pad * 1.25; // 책등 쪽은 종이가 휘어 들어가므로 여백을 더
   const left = side === 'right' ? gutter : pad;
   const right = w - (side === 'right' ? pad : gutter);
-  g.fillStyle = INK;
-  g.textBaseline = 'alphabetic';
+  L.fillStyle = INK;
+  L.textBaseline = 'alphabetic';
 
   if (page.type === 'title') {
-    g.textAlign = 'center';
-    g.font = `700 ${Math.round(w * 0.09)}px ${FONT}`;
+    L.textAlign = 'center';
+    L.font = `400 ${Math.round(w * 0.13)}px ${BOOK_FONT}`;
     const cx = (left + right) / 2;
-    g.fillText(page.title, cx, h * 0.42);
-    g.strokeStyle = INK;
-    g.lineWidth = 2;
-    g.beginPath(); g.moveTo(cx - w * 0.15, h * 0.47); g.lineTo(cx + w * 0.15, h * 0.47); g.stroke();
+    L.fillText(page.title, cx, h * 0.42);
+    L.strokeStyle = INK;
+    L.lineWidth = 2.5;
+    L.beginPath(); L.moveTo(cx - w * 0.15, h * 0.47); L.lineTo(cx + w * 0.15, h * 0.47); L.stroke();
   } else if (page.type === 'people') {
     const slotH = (h - pad * 2) / 2;
-    page.items.forEach((person, i) => drawEntry(g, person, left, pad + slotH * i, right - left, slotH, portraits));
+    page.items.forEach((person, i) => drawEntry(g, L, person, left, pad + slotH * i, right - left, slotH, portraits));
   }
 
   if (pageNo != null) {
-    g.font = `400 ${Math.round(w * 0.028)}px ${FONT}`;
-    g.textAlign = side === 'right' ? 'right' : 'left';
-    g.fillStyle = 'rgba(43,36,27,0.6)';
-    g.fillText(String(pageNo), side === 'right' ? right : left, h - pad * 0.55);
+    L.font = `400 ${Math.round(w * 0.042)}px ${BOOK_FONT}`;
+    L.textAlign = side === 'right' ? 'right' : 'left';
+    L.fillStyle = INK_SOFT;
+    L.fillText(String(pageNo), side === 'right' ? right : left, h - pad * 0.55);
   }
+
+  ageInk(ink, g.canvas);
+  g.save();
+  g.globalCompositeOperation = 'multiply'; // 종이 색·결이 잉크 아래로 비친다
+  g.drawImage(ink, 0, 0);
+  g.restore();
 }
 
-function drawEntry(g, person, x, y, w, h, portraits) {
+/**
+ * 잉크 레이어를 오래된 책처럼 만든다.
+ *  - 종이 결(밝기의 미세한 요철)을 따라 잉크 농도가 달라지고
+ *  - 넓은 범위로 살짝 바랜 얼룩이 생기며
+ *  - 전체적으로 약간 옅어진다.
+ */
+const INK_GRAIN = 2.4;     // 종이 결이 잉크에 드러나는 정도
+const INK_BLOTCH = 0.22;   // 바랜 얼룩의 세기
+const INK_OPACITY = 0.9;   // 잉크 전체 진하기
+function ageInk(ink, paperCanvas) {
+  const w = ink.width, h = ink.height;
+  const P = paperCanvas.getContext('2d');
+  const paper = P.getImageData(0, 0, w, h).data;
+  // 종이 밝기의 저주파: 작게 줄였다 키운 흐린 사본
+  const blur = document.createElement('canvas');
+  blur.width = w; blur.height = h;
+  const B = blur.getContext('2d');
+  const sw = Math.max(1, w >> 4), sh = Math.max(1, h >> 4);
+  B.drawImage(paperCanvas, 0, 0, sw, sh);
+  B.drawImage(blur, 0, 0, sw, sh, 0, 0, w, h);
+  const mean = B.getImageData(0, 0, w, h).data;
+  // 얼룩: 성긴 난수 격자를 부드럽게 키운 값 (페이지마다 다르게)
+  const nw = 12, nh = Math.round(12 * h / w);
+  const noise = document.createElement('canvas');
+  noise.width = nw; noise.height = nh;
+  const N = noise.getContext('2d');
+  const nd = N.createImageData(nw, nh);
+  for (let i = 0; i < nd.data.length; i += 4) { const v = Math.random() * 255; nd.data[i] = nd.data[i + 1] = nd.data[i + 2] = v; nd.data[i + 3] = 255; }
+  N.putImageData(nd, 0, 0);
+  const big = document.createElement('canvas');
+  big.width = w; big.height = h;
+  const G = big.getContext('2d');
+  G.imageSmoothingQuality = 'high';
+  G.drawImage(noise, 0, 0, w, h);
+  const blot = G.getImageData(0, 0, w, h).data;
+
+  const I = ink.getContext('2d');
+  const img = I.getImageData(0, 0, w, h);
+  const d = img.data;
+  for (let i = 0; i < d.length; i += 4) {
+    if (d[i + 3] === 0) continue;
+    const lum = paper[i] * 0.299 + paper[i + 1] * 0.587 + paper[i + 2] * 0.114;
+    const avg = mean[i] * 0.299 + mean[i + 1] * 0.587 + mean[i + 2] * 0.114 + 1;
+    const detail = (lum - avg) / avg;            // 종이가 밝은 결에선 잉크가 덜 묻는다
+    const b = blot[i] / 255 - 0.5;               // -0.5 ~ 0.5
+    const k = INK_OPACITY * (1 - INK_GRAIN * detail) * (1 - INK_BLOTCH * 2 * Math.max(0, b));
+    d[i + 3] = Math.min(255, Math.max(0, d[i + 3] * Math.min(1, Math.max(0.4, k))));
+  }
+  I.putImageData(img, 0, 0);
+}
+
+/** g: 종이(이미지용), L: 잉크 레이어(글씨·선용) */
+function drawEntry(g, L, person, x, y, w, h, portraits) {
   const ps = Math.min(w * 0.32, h * 0.5); // 초상화 크기
   const img = person.portrait ? portraits.get(person.portrait) : null;
   if (img) {
     const s = Math.min(img.naturalWidth, img.naturalHeight);
     g.drawImage(img, (img.naturalWidth - s) / 2, (img.naturalHeight - s) / 2, s, s, x, y, ps, ps);
   } else {
-    g.fillStyle = '#e2d6bd';
+    g.fillStyle = 'rgba(120, 90, 50, 0.12)';
     g.fillRect(x, y, ps, ps);
-    g.fillStyle = 'rgba(43,36,27,0.35)';
-    g.font = `700 ${Math.round(ps * 0.4)}px ${FONT}`;
-    g.textAlign = 'center';
-    g.textBaseline = 'middle';
-    g.fillText((person.name || '?').trim().charAt(0), x + ps / 2, y + ps / 2);
-    g.textBaseline = 'alphabetic';
+    L.fillStyle = INK_FADE;
+    L.font = `400 ${Math.round(ps * 0.55)}px ${BOOK_FONT}`;
+    L.textAlign = 'center';
+    L.textBaseline = 'middle';
+    L.fillText((person.name || '?').trim().charAt(0), x + ps / 2, y + ps / 2);
+    L.textBaseline = 'alphabetic';
   }
-  g.strokeStyle = 'rgba(43,36,27,0.5)';
-  g.lineWidth = 2;
-  g.strokeRect(x, y, ps, ps);
+  L.strokeStyle = INK_SOFT;
+  L.lineWidth = 2;
+  L.strokeRect(x, y, ps, ps);
 
   const tx = x + ps + w * 0.06;
   const tw = x + w - tx;
-  g.textAlign = 'left';
-  g.fillStyle = INK;
-  const nameSize = Math.round(w * 0.065);
-  g.font = `700 ${nameSize}px ${FONT}`;
-  fillWrapped(g, person.name || '', tx, y + nameSize, tw, nameSize * 1.25, 2);
+  L.textAlign = 'left';
+  L.fillStyle = INK;
+  const nameSize = Math.round(w * 0.09);
+  L.font = `400 ${nameSize}px ${BOOK_FONT}`;
+  fillWrapped(L, person.name || '', tx, y + nameSize * 0.9, tw, nameSize * 1.1, 2);
 
-  const subSize = Math.round(w * 0.038);
-  g.font = `400 ${subSize}px ${FONT}`;
-  g.fillStyle = 'rgba(43,36,27,0.7)';
-  fillWrapped(g, person.title || '', tx, y + nameSize * 1.4 + subSize * 1.2, tw, subSize * 1.4, 2);
+  const subSize = Math.round(w * 0.055);
+  L.font = `400 ${subSize}px ${BOOK_FONT}`;
+  L.fillStyle = INK_SOFT;
+  fillWrapped(L, person.title || '', tx, y + nameSize * 1.3 + subSize * 1.1, tw, subSize * 1.2, 2);
 
-  const bodySize = Math.round(w * 0.04);
-  g.font = `400 ${bodySize}px ${FONT}`;
-  g.fillStyle = INK;
-  const maxLines = Math.max(1, Math.floor((h - ps - bodySize * 2.5) / (bodySize * 1.6)));
-  fillWrapped(g, person.description || '', x, y + ps + bodySize * 1.8, w, bodySize * 1.6, maxLines);
+  const bodySize = Math.round(w * 0.056);
+  L.font = `400 ${bodySize}px ${BOOK_FONT}`;
+  L.fillStyle = INK;
+  const lineH = bodySize * 1.35;
+  const maxLines = Math.max(1, Math.floor((h - ps - bodySize * 2) / lineH));
+  fillWrapped(L, person.description || '', x, y + ps + bodySize * 1.5, w, lineH, maxLines);
 }
 
 /** 글자 단위 줄바꿈 (한글은 띄어쓰기 없이도 줄이 넘어가야 하므로). 넘치면 말줄임. */
