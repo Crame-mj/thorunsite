@@ -16,7 +16,23 @@ const MARK_STEP = 0.3;       // 마커 사이 간격
 const MARK_DELAY = 150;      // 책이 다 펼쳐진 뒤 마커가 나오기 시작할 때까지 (ms)
 const MARK_STAGGER = 70;     // 마커끼리 나오는 시간차 (ms)
 const MARK_OUT_MS = 550;     // 마커가 나오는 시간
-const MARK_IN_MS = 110;      // 마커가 들어가는 시간 (덮을 때는 빠르게)        // 표지 보드 두께
+const MARK_IN_MS = 110;      // 마커가 들어가는 시간 (덮을 때는 빠르게)
+// 사람이 손으로 끼운 것처럼 마커마다 조금씩 다르게 (섹션 id로 정해지는 값이라 새로고침해도 같은 모양)
+const MARK_JITTER_Y = 0.045;    // 위아래 어긋남 (±)
+const MARK_JITTER_OUT = 0.035;  // 튀어나온 길이 차이 (±)
+const MARK_JITTER_TILT = 6;     // 기울기 (±도)
+const MARK_DEPTH = [0.55, 0.9]; // 종이 더미 두께 중 끼워진 깊이 범위 (0=바닥, 1=윗면)
+
+/** 문자열로 시드를 정하는 결정적 난수 (0~1) */
+function seededRandom(str) {
+  let h = 2166136261;
+  for (const ch of str) h = Math.imul(h ^ ch.codePointAt(0), 16777619);
+  return () => {
+    h = Math.imul(h ^ (h >>> 15), 2246822507);
+    h = Math.imul(h ^ (h >>> 13), 3266489909);
+    return ((h ^= h >>> 16) >>> 0) / 4294967296;
+  };
+}        // 표지 보드 두께
 const EDGE_PERIOD = 0.03;    // 종이 단면 줄무늬 텍스처 한 주기의 실제 두께
 const TEX_W = 1024;          // 페이지 텍스처 가로 해상도
 const TEX_CACHE = 10;        // 메모리에 유지할 페이지 텍스처 수
@@ -568,10 +584,16 @@ export class Book {
       const i = counts[s.marker]++;
       // 마커는 종이 더미 '속'(윗면보다 약간 아래)에 끼워져 있다. 들어가 있을 땐 윗면 페이지와 단면에 가려 안 보이고,
       // 바깥으로 밀려 나오면 경사진 단면을 뚫고 나온 부분만 보인다.
-      const z = LIFT + this.h * 0.82;
-      const exitX = this.Wp + FORE_SLOPE * (1 - z / (LIFT + this.h)); // 이 x부터 바깥이 보인다
-      const xIn = this.Wp - MARK_W - 0.02;
-      const xOut = this.W + MARK_OUT - MARK_W;
+      const rnd = seededRandom(s.id);
+      const jit = (amp) => (rnd() * 2 - 1) * amp;
+      const depth = THREE.MathUtils.lerp(MARK_DEPTH[0], MARK_DEPTH[1], rnd());
+      const tilt = THREE.MathUtils.degToRad(jit(MARK_JITTER_TILT));
+      const y = MARK_TOP - i * MARK_STEP + jit(MARK_JITTER_Y);
+      const out = MARK_OUT + jit(MARK_JITTER_OUT);
+      const z = depth * (LIFT + this.h);
+      const exitX = this.Wp + FORE_SLOPE * (1 - z / (LIFT + this.h)); // 이 x부터 바깥이 보인다 (깊이 끼울수록 바깥쪽)
+      const xIn = this.Wp - MARK_W - 0.04;
+      const xOut = this.W + out - MARK_W;
       const visFrac = (xOut + MARK_W - exitX) / MARK_W;
       const geo = new THREE.PlaneGeometry(MARK_W, MARK_H);
       geo.translate(MARK_W / 2, 0, 0);
@@ -579,11 +601,12 @@ export class Book {
       if (isLeft) { tex.repeat.x = -1; tex.offset.x = 1; } // 왼쪽 더미는 거울 배치라 글자를 되돌린다
       const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, alphaTest: 0.5 });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(xIn, MARK_TOP - i * MARK_STEP, z);
+      mesh.position.set(xIn, y, z);
+      mesh.rotation.z = tilt; // 안쪽 끝을 축으로 살짝 비스듬히
       mesh.visible = false;
       mesh.userData.sectionId = s.id;
       half.group.add(mesh);
-      this.markers.push({ mesh, xIn, xOut, exitX, ext: 0, order: order++ });
+      this.markers.push({ mesh, xIn, xOut, y, tilt, exitX, ext: 0, order: order++ });
     }
     this._markerT = 0;
     this._markersWant = false;
@@ -603,7 +626,10 @@ export class Book {
         m.ext = Math.max(0, m.ext - dtMs / MARK_IN_MS);
       }
       m.mesh.visible = m.ext > 0.001;
-      m.mesh.position.x = THREE.MathUtils.lerp(m.xIn, m.xOut, m.ext);
+      // 기울어진 방향 그대로 미끄러져 나온다
+      const d = (m.xOut - m.xIn) * m.ext;
+      m.mesh.position.x = m.xIn + d;
+      m.mesh.position.y = m.y + d * Math.tan(m.tilt);
     }
   }
 
