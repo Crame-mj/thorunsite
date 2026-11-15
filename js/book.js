@@ -647,6 +647,15 @@ export class Book {
 
   get isDragging() { return this._drag !== null; }
 
+  /** 진행 중인 드래그를 취소하고 넘기던 페이지(또는 표지)는 원래 자리로 돌린다 (두 손가락 확대 시작 시) */
+  cancelDrag() {
+    const d = this._drag, f = this.flip;
+    this._drag = null;
+    if (!d || d.marker || !f || f.auto) return;
+    f.target = f.forward ? 0 : 1;
+    f.dragging = false;
+  }
+
   pointerDown(e, camera, rect) {
     if (this._drag || this._auto) return false; // 자동 넘김 중에는 조작을 막는다
     const sectionId = this.markerAt(e, camera, rect);

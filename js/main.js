@@ -110,6 +110,7 @@ function setMode(mode) {
   state.mode = mode;
   document.body.dataset.mode = mode; // 오디오 플레이어 위치 이동(CSS)
   state.zoomTarget = 0;
+  resetBookZoom();
   btnToBook.hidden = mode !== 'globe';
   btnToGlobe.hidden = mode !== 'book';
   continentList.hidden = mode !== 'globe';
@@ -125,8 +126,11 @@ function applyLayout() {
   globe.object.position.x = THREE.MathUtils.lerp(0, -fit.offX, e);
   book.object.position.x = THREE.MathUtils.lerp(fit.offX, 0, e);
   const zoom = 1 - ZOOM_AMOUNT * ease(state.zoom);
-  camera.position.set(0, 0, THREE.MathUtils.lerp(fit.globeDist, fit.bookDist, e) * zoom);
-  camera.lookAt(0, 0, 0);
+  // 개념서 두 손가락 확대: 카메라를 그만큼 당기고, 옮긴 만큼 카메라를 평행 이동
+  const bz = THREE.MathUtils.lerp(1, bookZoom.s, e);
+  const px = bookZoom.x * e, py = bookZoom.y * e;
+  camera.position.set(px, py, (THREE.MathUtils.lerp(fit.globeDist, fit.bookDist, e) * zoom) / bz);
+  camera.lookAt(px, py, 0);
   globe.object.visible = e < 0.999;
   book.object.visible = e > 0.001;
 }
@@ -299,6 +303,63 @@ function activeController() {
 }
 
 let dragOwner = null;
+
+// ---------------------------------------------------------------- 개념서 두 손가락 확대/축소 (터치 전용)
+// 한 손가락 = 페이지 넘기기, 두 손가락 = 확대·축소와 이동. 두 번째 손가락이 닿으면
+// 막 시작된 페이지 넘김은 취소(제자리로)되고 확대 모드로 바뀐다. 손가락을 다 떼기 전까지 넘김은 다시 시작되지 않는다.
+const BOOK_ZOOM_MAX = 3;
+const bookZoom = { s: 1, x: 0, y: 0 };
+const touches = new Map();  // 개념서 위에 올라간 손가락들 pointerId → {x, y}
+let pinch = null;           // { d0, s0, wx, wy } 두 손가락 시작 거리·배율과 손가락 중심 아래의 월드 좌표
+let pinchLock = false;      // 확대 후 남은 한 손가락으로 페이지가 넘어가지 않도록
+
+function resetBookZoom() {
+  bookZoom.s = 1; bookZoom.x = 0; bookZoom.y = 0;
+  touches.clear(); pinch = null; pinchLock = false;
+}
+
+/** 화면 1px이 개념서 확대 배율 s에서 카메라 평면 기준 몇 월드 단위인지 */
+function worldPerPx(s) {
+  const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  return (2 * t * fit.bookDist) / s / canvas.clientHeight;
+}
+
+function pinchInfo() {
+  const [a, b] = [...touches.values()];
+  const rect = canvas.getBoundingClientRect();
+  return {
+    d: Math.max(Math.hypot(a.x - b.x, a.y - b.y), 1),
+    mx: (a.x + b.x) / 2 - rect.left - rect.width / 2,   // 화면 가운데 기준
+    my: (a.y + b.y) / 2 - rect.top - rect.height / 2,
+  };
+}
+
+function clampBookPan() {
+  // 확대한 만큼만 옆으로 움직일 수 있게 (책이 화면 밖으로 사라지지 않도록)
+  const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const halfH = t * fit.bookDist, halfW = halfH * camera.aspect;
+  const k = 1 - 1 / bookZoom.s;
+  bookZoom.x = THREE.MathUtils.clamp(bookZoom.x, -halfW * k, halfW * k);
+  bookZoom.y = THREE.MathUtils.clamp(bookZoom.y, -halfH * k, halfH * k);
+}
+
+function startPinch() {
+  const { d, mx, my } = pinchInfo();
+  const k = worldPerPx(bookZoom.s);
+  pinch = { d0: d, s0: bookZoom.s, wx: bookZoom.x + mx * k, wy: bookZoom.y - my * k };
+  pinchLock = true;
+}
+
+function updatePinch() {
+  const { d, mx, my } = pinchInfo();
+  bookZoom.s = THREE.MathUtils.clamp(pinch.s0 * d / pinch.d0, 1, BOOK_ZOOM_MAX);
+  // 처음 손가락 사이에 있던 지점이 계속 손가락 사이에 오도록 이동 (확대하면서 끌어 옮기기 가능)
+  const k = worldPerPx(bookZoom.s);
+  bookZoom.x = pinch.wx - mx * k;
+  bookZoom.y = pinch.wy + my * k;
+  if (bookZoom.s < 1.02) { bookZoom.s = 1; }
+  clampBookPan();
+}
 let tap = null; // 지구본을 짧게 눌렀는지 판정 (핀 클릭)
 const ndc = new THREE.Vector2();
 
@@ -308,6 +369,18 @@ function toNdc(e) {
 }
 
 canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'touch' && activeController() === 'book') {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (touches.size === 2) {
+      // 두 번째 손가락: 넘기던 페이지는 제자리로 돌리고 확대 모드로
+      if (dragOwner === 'book') { book.cancelDrag(); dragOwner = null; canvas.classList.remove('dragging'); }
+      for (const id of touches.keys()) { try { canvas.setPointerCapture(id); } catch { /* 이미 뗀 손가락 */ } }
+      startPinch();
+      e.preventDefault();
+      return;
+    }
+    if (touches.size > 2 || pinchLock) return;
+  }
   if (dragOwner || (e.pointerType === 'mouse' && e.button !== 0)) return;
   const c = activeController();
   const rect = canvas.getBoundingClientRect();
@@ -321,6 +394,10 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 
 canvas.addEventListener('pointermove', (e) => {
+  if (touches.has(e.pointerId)) {
+    touches.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pinch && touches.size === 2) { updatePinch(); return; }
+  }
   if (dragOwner === 'globe') globe.pointerMove(e, canvas.clientHeight);
   else if (dragOwner === 'book') book.pointerMove(e, camera, canvas.getBoundingClientRect());
   else if (e.pointerType === 'mouse') {
@@ -334,6 +411,10 @@ canvas.addEventListener('pointermove', (e) => {
 });
 
 function endDrag(e) {
+  if (touches.delete(e.pointerId)) {
+    if (pinch && touches.size < 2) pinch = null;
+    if (touches.size === 0) pinchLock = false; // 손가락을 모두 떼야 다시 페이지를 넘길 수 있다
+  }
   if (!dragOwner) return;
   if (dragOwner === 'globe') {
     globe.pointerUp(e);
