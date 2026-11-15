@@ -4,6 +4,7 @@ import { Book } from './book.js';
 import { SECTIONS, BOOK_TITLE, COVER_TITLE } from './lexicon.js';
 import { CONTINENTS } from './continents.js';
 import { setupAudioPlayer } from './audio-player.js';
+import { createBookSfx } from './sfx.js';
 
 // 지구본 텍스처: 등장방형(equirectangular) 2:1 이미지
 // world-map-globe.webp는 원본(world-map.webp)을 극지방 왜곡이 덜하도록 재투영한 버전
@@ -77,6 +78,7 @@ const book = await Book.create({
   renderer, pageWidth: 1.3, pageHeight: 1.8, sections: SECTIONS, title: BOOK_TITLE, coverTitle: COVER_TITLE, textures: BOOK_TEXTURES,
 });
 scene.add(book.object);
+const bookSfx = createBookSfx();
 
 // ------------------------------------------------------------------ 화면 맞춤
 
@@ -457,6 +459,7 @@ function frame(now) {
 
   globe.update(dt);
   book.update(dt);
+  bookSfx.update(book);
   renderer.render(scene, camera);
   requestAnimationFrame(frame);
 }
