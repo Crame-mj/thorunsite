@@ -18,10 +18,11 @@ const MARK_STAGGER = 70;     // 마커끼리 나오는 시간차 (ms)
 const MARK_OUT_MS = 550;     // 마커가 나오는 시간
 const MARK_IN_MS = 110;      // 마커가 들어가는 시간 (덮을 때는 빠르게)
 // 사람이 손으로 끼운 것처럼 마커마다 조금씩 다르게 (섹션 id로 정해지는 값이라 새로고침해도 같은 모양)
-const MARK_JITTER_Y = 0.045;    // 위아래 어긋남 (±)
-const MARK_JITTER_OUT = 0.035;  // 튀어나온 길이 차이 (±)
-const MARK_JITTER_TILT = 6;     // 기울기 (±도)
-const MARK_DEPTH = [0.55, 0.9]; // 종이 더미 두께 중 끼워진 깊이 범위 (0=바닥, 1=윗면)
+const MARK_JITTER_Y = 0.075;    // 위아래 어긋남 (±)
+const MARK_JITTER_OUT = 0.06;   // 튀어나온 길이 차이 (±)
+const MARK_JITTER_TILT = 15;    // 기울기 (±도)
+const MARK_WIDTH = [0.8, 1.25]; // 마커 폭 배율 범위 (MARK_H 기준)
+const MARK_DEPTH = [0.3, 0.92]; // 종이 더미 두께 중 끼워진 깊이 범위 (0=바닥, 1=윗면)
 
 /** 문자열로 시드를 정하는 결정적 난수 (0~1) */
 function seededRandom(str) {
@@ -576,6 +577,7 @@ export class Book {
   _buildMarkers() {
     this.markers = [];
     const counts = { left: 0, right: 0 };
+    const lastY = { left: Infinity, right: Infinity }, lastH = { left: 0, right: 0 };
     let order = 0;
     for (const s of this.sections) {
       if (s.marker !== 'left' && s.marker !== 'right') continue;
@@ -588,16 +590,19 @@ export class Book {
       const jit = (amp) => (rnd() * 2 - 1) * amp;
       const depth = THREE.MathUtils.lerp(MARK_DEPTH[0], MARK_DEPTH[1], rnd());
       const tilt = THREE.MathUtils.degToRad(jit(MARK_JITTER_TILT));
-      const y = MARK_TOP - i * MARK_STEP + jit(MARK_JITTER_Y);
       const out = MARK_OUT + jit(MARK_JITTER_OUT);
+      const mh = MARK_H * THREE.MathUtils.lerp(MARK_WIDTH[0], MARK_WIDTH[1], rnd());
+      // 바로 위 마커와는 살짝 겹치는 정도까지만 붙게 (글자가 가려질 만큼 포개지지 않도록)
+      const y = Math.min(MARK_TOP - i * MARK_STEP + jit(MARK_JITTER_Y), lastY[s.marker] - (lastH[s.marker] + mh) / 2 * 0.85);
+      lastY[s.marker] = y; lastH[s.marker] = mh;
       const z = depth * (LIFT + this.h);
       const exitX = this.Wp + FORE_SLOPE * (1 - z / (LIFT + this.h)); // 이 x부터 바깥이 보인다 (깊이 끼울수록 바깥쪽)
       const xIn = this.Wp - MARK_W - 0.04;
       const xOut = this.W + out - MARK_W;
       const visFrac = (xOut + MARK_W - exitX) / MARK_W;
-      const geo = new THREE.PlaneGeometry(MARK_W, MARK_H);
+      const geo = new THREE.PlaneGeometry(MARK_W, mh);
       geo.translate(MARK_W / 2, 0, 0);
-      const tex = this._canvasTex(MARK_W / MARK_H, (g, w, h) => drawMarker(g, w, h, s.label, isLeft, visFrac));
+      const tex = this._canvasTex(MARK_W / mh, (g, w, h) => drawMarker(g, w, h, s.label, isLeft, visFrac));
       if (isLeft) { tex.repeat.x = -1; tex.offset.x = 1; } // 왼쪽 더미는 거울 배치라 글자를 되돌린다
       const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, alphaTest: 0.5 });
       const mesh = new THREE.Mesh(geo, mat);
@@ -1070,7 +1075,8 @@ function drawMarker(g, w, h, label, isLeft, visFrac) {
   const vis = w * Math.min(1, visFrac);
   const cx = isLeft ? vis / 2 : w - vis / 2;
   const lines = label.split('·').map((t) => t.trim()).filter(Boolean);
-  const size = Math.round(h * (lines.length > 1 ? 0.36 : 0.46));
+  // 마커 폭이 제각각이라 글자 크기는 길이 기준으로 맞추고, 폭이 좁으면 그에 맞춰 줄인다
+  const size = Math.round(Math.min(w * (lines.length > 1 ? 0.17 : 0.2), h * (lines.length > 1 ? 0.4 : 0.55)));
   g.font = `400 ${size}px ${BOOK_FONT}`;
   g.fillStyle = INK;
   g.textAlign = 'center';
