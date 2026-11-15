@@ -7,7 +7,7 @@ const SRC = {
   drop: 'assets/audio/bookdrop.mp3',
   page: 'assets/audio/paperturn.mp3',
 };
-const VOLUME = { drop: 0.7, page: 0.8 };  // 고정 볼륨 (0~1)
+const VOLUME = { drop: 0.5, page: 0.5 };  // 고정 볼륨 (0~1)
 
 const RATE_MIN = 0.4;     // 페이지 소리 재생 속도 범위 (1 = 원래 속도)
 const RATE_MAX = 2.4;
