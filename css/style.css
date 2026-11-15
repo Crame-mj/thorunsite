@@ -309,6 +309,20 @@ html, body {
   padding: 32px 28px 28px;
   overflow-y: auto;
   min-height: 0;
+  contain: size; /* 설명 길이가 팝업 높이를 늘리지 않게: 높이는 이미지 쪽이 정하고 설명은 그 안에서 스크롤 */
+  overscroll-behavior: contain;
+  scrollbar-width: none; /* 스크롤바는 숨기고 드래그·휠·터치로 스크롤 */
+  --fade: 36px;
+}
+.popup-body::-webkit-scrollbar { display: none; }
+.popup-body.scrollable { cursor: grab; }
+.popup-body.dragging { cursor: grabbing; user-select: none; }
+/* 위·아래에 내용이 더 있으면 가장자리를 흐리게 */
+.popup-body.more-below { -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent); mask-image: linear-gradient(to bottom, #000 calc(100% - var(--fade)), transparent); }
+.popup-body.more-above { -webkit-mask-image: linear-gradient(to top, #000 calc(100% - var(--fade)), transparent); mask-image: linear-gradient(to top, #000 calc(100% - var(--fade)), transparent); }
+.popup-body.more-above.more-below {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--fade), #000 calc(100% - var(--fade)), transparent);
 }
 .popup-body h2 {
   margin: 0 0 0.8em;
@@ -344,12 +358,15 @@ html, body {
   .region-pin.home::before { left: 8px; }
   .region-pin:not(.home)::before { inset: 11px; border-width: 1.5px; } /* 작은 이미지에선 핀을 작게 (판정 범위는 그대로) */
   /* 좁은 화면: 이미지 위, 설명 아래로 쌓는다 */
+  /* 세로로 쌓을 땐 flex로: 이미지는 제 크기, 설명은 남은 높이 안에서 스크롤 */
   .popup-panel {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto minmax(0, 1fr);
+    display: flex;
+    flex-direction: column;
     width: calc(100vw - 32px);
     min-height: 0;
   }
+  .popup-media { flex: none; }
+  .popup-body { contain: none; flex: 1 1 auto; }
   .popup-media { border-right: none; border-bottom: 1px solid rgba(233, 228, 216, 0.15); min-width: 0; }
   .popup-media img { max-width: 100%; max-height: 55dvh; }
   .popup-empty { padding: 60px 20px; }
@@ -498,4 +515,46 @@ body:not([data-mode="book"]) .ap-list { left: auto; right: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .audio-player { transition: none; }
+}
+
+/* ------------------------------------------------------------ 사이트 로고 */
+
+.site-logo {
+  position: fixed;
+  top: max(14px, env(safe-area-inset-top));
+  left: max(20px, env(safe-area-inset-left));
+  z-index: 12;
+  margin: 0;
+  width: clamp(170px, 17vw, 250px);
+  line-height: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.45));
+  animation: logo-in 0.6s ease-out;
+}
+.site-logo img { width: 100%; height: auto; }
+/* 개념서 화면: 우상단. 이동 없이 자리만 바꾸고 살짝 페이드 */
+body[data-mode="book"] .site-logo {
+  left: auto;
+  right: max(20px, env(safe-area-inset-right));
+  animation: logo-in-book 0.6s ease-out;
+}
+@keyframes logo-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes logo-in-book { from { opacity: 0; } to { opacity: 1; } }
+
+@media (max-width: 600px) {
+  /* 모바일: 로고는 상단 가운데, 그 아래로 플레이어 → 대륙 목록 */
+  .site-logo,
+  body[data-mode="book"] .site-logo {
+    top: max(8px, env(safe-area-inset-top));
+    left: 50%;
+    right: auto;
+    width: 150px;
+    translate: -50% 0;
+  }
+  .audio-player { top: calc(max(8px, env(safe-area-inset-top)) + 70px); }
+  .continent-list { top: calc(max(8px, env(safe-area-inset-top)) + 118px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .site-logo, body[data-mode="book"] .site-logo { animation: none; }
 }

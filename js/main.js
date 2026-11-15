@@ -161,7 +161,8 @@ function showDescription(c, region) {
   const showSub = Boolean(region && region.name);
   popupSubtitle.hidden = !showSub;
   popupSubtitle.textContent = showSub ? displayName(region) : '';
-  popupDesc.parentElement.scrollTop = 0;
+  popupBody.scrollTop = 0;
+  requestAnimationFrame(updateScrollHint);
   for (const pin of popupPins.children) {
     const active = region ? pin.dataset.region === region.id : pin.dataset.region === '';
     pin.classList.toggle('active', active);
@@ -225,6 +226,42 @@ function closePopup() {
   globe.select(null);
   if (popupReturnFocus && document.contains(popupReturnFocus)) popupReturnFocus.focus({ preventScroll: true });
   popupReturnFocus = null;
+}
+
+// 설명 칸: 스크롤바 없이 드래그로 올리고 내린다. 터치는 브라우저 기본 스크롤을 그대로 쓰고,
+// 마우스는 직접 드래그를 처리한다. 아래에 내용이 더 있으면 끝을 흐리게 해서 알려준다.
+const popupBody = popupDesc.parentElement;
+function updateScrollHint() {
+  const max = popupBody.scrollHeight - popupBody.clientHeight;
+  popupBody.classList.toggle('scrollable', max > 2);
+  popupBody.classList.toggle('more-below', popupBody.scrollTop < max - 2);
+  popupBody.classList.toggle('more-above', popupBody.scrollTop > 2);
+}
+popupBody.addEventListener('scroll', updateScrollHint, { passive: true });
+window.addEventListener('resize', updateScrollHint);
+new ResizeObserver(updateScrollHint).observe(popupBody);
+{
+  let drag = null;
+  popupBody.addEventListener('pointerdown', (e) => {
+    if (e.pointerType !== 'mouse' || e.button !== 0) return;
+    if (popupBody.scrollHeight <= popupBody.clientHeight) return;
+    e.preventDefault(); // 끌어서 스크롤할 때 글자가 선택되지 않도록
+    drag = { id: e.pointerId, y: e.clientY, top: popupBody.scrollTop, moved: false };
+  });
+  popupBody.addEventListener('pointermove', (e) => {
+    if (!drag || drag.id !== e.pointerId) return;
+    const dy = e.clientY - drag.y;
+    if (!drag.moved && Math.abs(dy) < 3) return;
+    if (!drag.moved) { drag.moved = true; popupBody.setPointerCapture(e.pointerId); popupBody.classList.add('dragging'); }
+    popupBody.scrollTop = drag.top - dy;
+  });
+  const end = (e) => {
+    if (!drag || drag.id !== e.pointerId) return;
+    drag = null;
+    popupBody.classList.remove('dragging');
+  };
+  popupBody.addEventListener('pointerup', end);
+  popupBody.addEventListener('pointercancel', end);
 }
 
 popup.addEventListener('click', (e) => {
