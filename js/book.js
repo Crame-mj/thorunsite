@@ -593,7 +593,9 @@ export class Book {
       const out = MARK_OUT + jit(MARK_JITTER_OUT);
       const mh = MARK_H * THREE.MathUtils.lerp(MARK_WIDTH[0], MARK_WIDTH[1], rnd());
       // 바로 위 마커와는 살짝 겹치는 정도까지만 붙게 (글자가 가려질 만큼 포개지지 않도록)
-      const y = Math.min(MARK_TOP - i * MARK_STEP + jit(MARK_JITTER_Y), lastY[s.marker] - (lastH[s.marker] + mh) / 2 * 0.85);
+      // markerShift: 섹션별로 손으로 미세 조정하는 위아래 위치 (음수 = 아래로)
+      const y = Math.min(MARK_TOP - i * MARK_STEP + jit(MARK_JITTER_Y), lastY[s.marker] - (lastH[s.marker] + mh) / 2 * 0.85)
+        + (s.markerShift ?? 0);
       lastY[s.marker] = y; lastH[s.marker] = mh;
       const z = depth * (LIFT + this.h);
       const exitX = this.Wp + FORE_SLOPE * (1 - z / (LIFT + this.h)); // 이 x부터 바깥이 보인다 (깊이 끼울수록 바깥쪽)

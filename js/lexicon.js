@@ -6,6 +6,7 @@
 //   id     : 고유 이름
 //   label  : 페이지 마커와 섹션 첫 페이지 머리말에 쓰이는 이름. '·' 앞뒤로 마커에서 두 줄로 나뉜다.
 //   marker : 'left' | 'right' — 페이지 마커가 책 왼쪽/오른쪽 중 어디에 붙는지 (위에서부터 순서대로)
+//   markerShift : (선택) 마커 위아래 위치 미세 조정. 음수면 아래로 (페이지 높이가 1.8 기준)
 //   pages  : 섹션의 페이지 목록. 지금은 빈 페이지 두 장씩.
 //
 // 페이지 형식 (모두 선택)
@@ -18,10 +19,10 @@ export const COVER_TITLE = 'Lexicon'; // 표지 금박 글자
 
 export const SECTIONS = [
   { id: 'world-concept', label: '세계관·개념', marker: 'left', pages: [{}, {}] },
-  { id: 'world-region', label: '세계관·지역', marker: 'left', pages: [{}, {}] },
-  { id: 'world-race', label: '세계관·종족', marker: 'left', pages: [{}, {}] },
+  { id: 'world-region', label: '세계관·지역', marker: 'left', markerShift: -0.04, pages: [{}, {}] },
+  { id: 'world-race', label: '세계관·종족', marker: 'left', markerShift: -0.06, pages: [{}, {}] },
   { id: 'people-upper', label: '인명록·상위', marker: 'right', pages: [{}, {}] },
   { id: 'people-middle', label: '인명록·중위', marker: 'right', pages: [{}, {}] },
   { id: 'people-lower', label: '인명록·하위', marker: 'right', pages: [{}, {}] },
-  { id: 'monsters', label: '마물', marker: 'right', pages: [{}, {}] },
+  { id: 'monsters', label: '마물', marker: 'right', markerShift: -0.09, pages: [{}, {}] },
 ];
