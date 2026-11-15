@@ -6,7 +6,17 @@ const LIFT = 0.0015;         // 표시 페이지를 종이 더미 윗면 위로 
 const GUTTER_U = 0.2;        // 책등에서 종이가 솟아오르는 구간 (페이지 폭 대비 비율)
 const FORE_SLOPE = 0.12;     // 바깥쪽 종이 더미 경사면의 가로 폭 (펼쳤을 때 좌우 더미로 보이는 부분)
 const PAGE_LAG = 0.42;       // 넘길 때 책등 쪽이 바깥쪽보다 늦게 따라오는 정도 (클수록 많이 휨)
-const COVER_T = 0.03;        // 표지 보드 두께
+const COVER_T = 0.03;
+// 페이지 마커(섹션 탭)
+const MARK_W = 0.42;         // 마커 길이 (책 바깥 방향)
+const MARK_H = 0.2;          // 마커 폭 (책 위아래 방향)
+const MARK_OUT = 0.17;       // 다 나왔을 때 종이 더미 바깥으로 튀어나오는 길이
+const MARK_TOP = 0.66;       // 첫 마커 위치 (책 세로 중심 기준)
+const MARK_STEP = 0.3;       // 마커 사이 간격
+const MARK_DELAY = 150;      // 책이 다 펼쳐진 뒤 마커가 나오기 시작할 때까지 (ms)
+const MARK_STAGGER = 70;     // 마커끼리 나오는 시간차 (ms)
+const MARK_OUT_MS = 550;     // 마커가 나오는 시간
+const MARK_IN_MS = 110;      // 마커가 들어가는 시간 (덮을 때는 빠르게)        // 표지 보드 두께
 const EDGE_PERIOD = 0.03;    // 종이 단면 줄무늬 텍스처 한 주기의 실제 두께
 const TEX_W = 1024;          // 페이지 텍스처 가로 해상도
 const TEX_CACHE = 10;        // 메모리에 유지할 페이지 텍스처 수
@@ -43,7 +53,7 @@ export class Book {
   static async create(opts) {
     const t = opts.textures ?? {};
     const [portraits, cover, paper, edge] = await Promise.all([
-      loadPortraits(opts.people ?? []),
+      loadPortraits((opts.sections ?? []).flatMap((s) => s.pages).flatMap((p) => p.items ?? [])),
       t.cover ? loadImage(t.cover) : null,
       t.paper ? loadImage(t.paper) : null,
       t.edge ? loadImage(t.edge) : null,
@@ -51,7 +61,7 @@ export class Book {
     return new Book(opts, portraits, { cover, paper, edge });
   }
 
-  constructor({ renderer, pageWidth = 1.3, pageHeight = 1.8, people = [], title = '개념서', coverTitle = title, perPage = 2 }, portraits = new Map(), images = {}) {
+  constructor({ renderer, pageWidth = 1.3, pageHeight = 1.8, sections = [], title = '개념서', coverTitle = title }, portraits = new Map(), images = {}) {
     this.W = pageWidth;                    // 종이 더미 전체 폭 (경사면 포함)
     this.Wp = pageWidth - FORE_SLOPE;      // 윗면(내용이 보이는 페이지) 폭
     this.H = pageHeight;
@@ -64,13 +74,19 @@ export class Book {
     this.title = title;
     this.coverTitle = coverTitle; // 표지에 금박으로 찍히는 글자 (첫 장 제목과 별도)
 
+    // 첫 장(제목)은 오른쪽 페이지. 섹션은 항상 왼쪽 페이지(홀수 인덱스)에서 시작하도록 맞춘다.
     const pages = [{ type: 'title', title }];
-    for (let i = 0; i < people.length; i += perPage) {
-      pages.push({ type: 'people', items: people.slice(i, i + perPage) });
+    this.sections = sections;
+    this.sectionSpread = {};   // 섹션 id → 그 섹션 첫 페이지가 왼쪽에 펼쳐지는 spread 번호
+    for (const s of sections) {
+      if (pages.length % 2 === 0) pages.push({ type: 'blank' });
+      this.sectionSpread[s.id] = (pages.length + 1) / 2;
+      s.pages.forEach((p, i) => pages.push({ ...p, section: s.label, sectionStart: i === 0 }));
     }
     if (pages.length % 2) pages.push({ type: 'blank' });
     this.pages = pages;
     this.S = pages.length / 2; // 넘길 수 있는 장 수
+    this._auto = null;         // 페이지 마커로 이동 중일 때 { target }
 
     // 상태
     this.k = 0;               // 현재 spread
@@ -92,6 +108,7 @@ export class Book {
     this._buildHalves();
     this._buildSpine();
     this._buildLeaf();
+    this._buildMarkers();
 
     this._applyCover(true);
     this._refreshTextures();
@@ -508,8 +525,106 @@ export class Book {
     this._refreshTextures();
   }
 
-  next() { const f = this._startFlip(true, false); if (f) f.target = 1; }
-  prev() { const f = this._startFlip(false, false); if (f) f.target = 0; }
+  next() { if (this._auto) return; const f = this._startFlip(true, false); if (f) f.target = 1; }
+  prev() { if (this._auto) return; const f = this._startFlip(false, false); if (f) f.target = 0; }
+
+  /** 페이지 마커 등으로 자동 넘김이 진행 중인지 (이 동안 사용자 조작은 막힌다) */
+  get isAutoFlipping() { return this._auto !== null; }
+
+  /** 섹션 첫 페이지까지 필요한 만큼 페이지를 빠르게 자동으로 넘긴다 */
+  goToSection(id) {
+    const target = this.sectionSpread[id];
+    if (target == null || !this.coverOpen || this._auto) return;
+    if (this.flip) this._finishFlip(true);
+    if (target === this.k) return;
+    const dist = Math.abs(target - this.k);
+    // 많이 넘길수록 한 장당 시간을 줄인다 (총 시간이 너무 길어지지 않도록)
+    this._auto = { target, dur: THREE.MathUtils.clamp(1000 / dist, 170, 380) };
+    this._autoStep();
+  }
+
+  _autoStep() {
+    const a = this._auto;
+    if (!a) return;
+    if (this.k === a.target) { this._auto = null; return; }
+    const f = this._startFlip(a.target > this.k, false);
+    if (!f) { this._auto = null; return; }
+    f.auto = true;
+    f.t = 0;
+    f.dur = a.dur;
+    f.target = f.forward ? 1 : 0;
+  }
+
+  // ================================================================ 페이지 마커
+
+  _buildMarkers() {
+    this.markers = [];
+    const counts = { left: 0, right: 0 };
+    let order = 0;
+    for (const s of this.sections) {
+      if (s.marker !== 'left' && s.marker !== 'right') continue;
+      const isLeft = s.marker === 'left';
+      const half = isLeft ? this.left : this.right;
+      const i = counts[s.marker]++;
+      // 마커는 종이 더미 '속'(윗면보다 약간 아래)에 끼워져 있다. 들어가 있을 땐 윗면 페이지와 단면에 가려 안 보이고,
+      // 바깥으로 밀려 나오면 경사진 단면을 뚫고 나온 부분만 보인다.
+      const z = LIFT + this.h * 0.82;
+      const exitX = this.Wp + FORE_SLOPE * (1 - z / (LIFT + this.h)); // 이 x부터 바깥이 보인다
+      const xIn = this.Wp - MARK_W - 0.02;
+      const xOut = this.W + MARK_OUT - MARK_W;
+      const visFrac = (xOut + MARK_W - exitX) / MARK_W;
+      const geo = new THREE.PlaneGeometry(MARK_W, MARK_H);
+      geo.translate(MARK_W / 2, 0, 0);
+      const tex = this._canvasTex(MARK_W / MARK_H, (g, w, h) => drawMarker(g, w, h, s.label, isLeft, visFrac));
+      if (isLeft) { tex.repeat.x = -1; tex.offset.x = 1; } // 왼쪽 더미는 거울 배치라 글자를 되돌린다
+      const mat = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.9, alphaTest: 0.5 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(xIn, MARK_TOP - i * MARK_STEP, z);
+      mesh.visible = false;
+      mesh.userData.sectionId = s.id;
+      half.group.add(mesh);
+      this.markers.push({ mesh, xIn, xOut, exitX, ext: 0, order: order++ });
+    }
+    this._markerT = 0;
+    this._markersWant = false;
+  }
+
+  _updateMarkers(dtMs) {
+    // 책이 완전히 펼쳐진 상태(표지 넘김 중 아님)에서만 마커를 내민다
+    const want = this.coverOpen && !(this.flip && this.flip.kind === 'cover');
+    if (want && !this._markersWant) this._markerT = 0;
+    this._markersWant = want;
+    if (want) this._markerT += dtMs;
+    for (const m of this.markers) {
+      if (want) {
+        const t = THREE.MathUtils.clamp((this._markerT - MARK_DELAY - m.order * MARK_STAGGER) / MARK_OUT_MS, 0, 1);
+        m.ext = Math.max(m.ext, 1 - Math.pow(1 - t, 3)); // 스르르 감속하며 나온다
+      } else {
+        m.ext = Math.max(0, m.ext - dtMs / MARK_IN_MS);
+      }
+      m.mesh.visible = m.ext > 0.001;
+      m.mesh.position.x = THREE.MathUtils.lerp(m.xIn, m.xOut, m.ext);
+    }
+  }
+
+  /** 화면 좌표에 있는 (다 나와 있는) 마커의 섹션 id */
+  markerAt(e, camera, rect) {
+    if (this._auto || !this.markers.length) return null;
+    this._ndc.set(
+      ((e.clientX - rect.left) / rect.width) * 2 - 1,
+      -((e.clientY - rect.top) / rect.height) * 2 + 1,
+    );
+    this._ray.setFromCamera(this._ndc, camera);
+    const live = this.markers.filter((m) => m.ext > 0.95);
+    const hits = this._ray.intersectObjects(live.map((m) => m.mesh), false);
+    for (const hit of hits) {
+      const m = live.find((x) => x.mesh === hit.object);
+      // 종이 더미 밖으로 나와 보이는 부분을 눌렀을 때만
+      const local = hit.object.parent.worldToLocal(hit.point.clone());
+      if (local.x >= m.exitX - 0.01) return hit.object.userData.sectionId;
+    }
+    return null;
+  }
 
   _centerTarget() {
     const f = this.flip;
@@ -533,7 +648,13 @@ export class Book {
   get isDragging() { return this._drag !== null; }
 
   pointerDown(e, camera, rect) {
-    if (this._drag) return false;
+    if (this._drag || this._auto) return false; // 자동 넘김 중에는 조작을 막는다
+    const sectionId = this.markerAt(e, camera, rect);
+    if (sectionId) {
+      this._drag = { id: e.pointerId, marker: true };
+      this.goToSection(sectionId);
+      return true;
+    }
     const pt = this._localPoint(e, camera, rect);
     if (!pt) return false;
     const m = 0.08;
@@ -555,7 +676,7 @@ export class Book {
 
   pointerMove(e, camera, rect) {
     const d = this._drag, f = this.flip;
-    if (!d || d.id !== e.pointerId || !f) return;
+    if (!d || d.id !== e.pointerId || !f || d.marker) return;
     const pt = this._localPoint(e, camera, rect);
     if (!pt) return;
     const w = d.w;
@@ -574,7 +695,7 @@ export class Book {
     const d = this._drag, f = this.flip;
     if (!d || d.id !== e.pointerId) return;
     this._drag = null;
-    if (!f) return;
+    if (!f || d.marker || f.auto) return;
     const now = performance.now();
     const moved = Math.hypot(e.clientX - d.sx, e.clientY - d.sy);
     if (moved < 6 && now - d.t0 < 350) {
@@ -590,7 +711,12 @@ export class Book {
 
   update(dtMs) {
     const f = this.flip;
-    if (f && !f.dragging) {
+    if (f && f.auto) {
+      f.t = Math.min(1, f.t + dtMs / f.dur);
+      const e = easeInOut(f.t);
+      f.p = f.forward ? e : 1 - e;
+      if (f.t >= 1) { f.p = f.target; this._finishFlip(); this._autoStep(); }
+    } else if (f && !f.dragging) {
       const diff = f.target - f.p;
       if (Math.abs(diff) < 1e-3) { f.p = f.target; this._finishFlip(); }
       else f.p += diff * (1 - Math.exp(-dtMs * 0.006));
@@ -599,6 +725,7 @@ export class Book {
 
     this._applyCover();
     this._updateLeaf();
+    this._updateMarkers(dtMs);
 
     this.inner.position.x += (this._centerTarget() - this.inner.position.x) * (1 - Math.exp(-dtMs * 0.006));
   }
@@ -771,9 +898,49 @@ function drawPage(g, w, h, page, side, pageNo, portraits, paper) {
     L.strokeStyle = INK;
     L.lineWidth = 2.5;
     L.beginPath(); L.moveTo(cx - w * 0.15, h * 0.47); L.lineTo(cx + w * 0.15, h * 0.47); L.stroke();
-  } else if (page.type === 'people') {
-    const slotH = (h - pad * 2) / 2;
-    page.items.forEach((person, i) => drawEntry(g, L, person, left, pad + slotH * i, right - left, slotH, portraits));
+  } else {
+    let y = pad;
+    // 섹션 첫 페이지: 섹션 이름 머리말 / 나머지 페이지: 바깥쪽 위에 작은 섹션 이름
+    if (page.sectionStart) {
+      const size = Math.round(w * 0.1);
+      L.textAlign = 'center';
+      L.font = `400 ${size}px ${BOOK_FONT}`;
+      const cx = (left + right) / 2;
+      L.fillText(page.section.replace('·', ' · '), cx, y + size * 0.8);
+      L.strokeStyle = INK_SOFT;
+      L.lineWidth = 2;
+      const ly = y + size * 1.25;
+      L.beginPath(); L.moveTo(cx - w * 0.22, ly); L.lineTo(cx + w * 0.22, ly); L.stroke();
+      y = ly + size * 0.6;
+    } else if (page.section) {
+      L.font = `400 ${Math.round(w * 0.04)}px ${BOOK_FONT}`;
+      L.fillStyle = INK_FADE;
+      L.textAlign = side === 'right' ? 'right' : 'left';
+      L.fillText(page.section.replace('·', ' · '), side === 'right' ? right : left, pad * 0.6);
+      L.fillStyle = INK;
+    }
+    if (page.type === 'people') {
+      const slotH = (h - pad - y) / 2;
+      page.items.forEach((person, i) => drawEntry(g, L, person, left, y + slotH * i, right - left, slotH, portraits));
+    } else {
+      L.textAlign = 'left';
+      if (page.heading) {
+        const hs = Math.round(w * 0.075);
+        L.font = `400 ${hs}px ${BOOK_FONT}`;
+        L.fillStyle = INK;
+        y += hs;
+        fillWrapped(L, page.heading, left, y, right - left, hs * 1.15, 2);
+        y += hs * 0.9;
+      }
+      if (page.body) {
+        const bs = Math.round(w * 0.056);
+        L.font = `400 ${bs}px ${BOOK_FONT}`;
+        L.fillStyle = INK;
+        const lh = bs * 1.4;
+        y += bs;
+        fillWrapped(L, page.body, left, y, right - left, lh, Math.max(1, Math.floor((h - pad - y) / lh)));
+      }
+    }
   }
 
   if (pageNo != null) {
@@ -839,6 +1006,42 @@ function ageInk(ink, paperCanvas) {
     d[i + 3] = Math.min(255, Math.max(0, d[i + 3] * Math.min(1, Math.max(0.4, k))));
   }
   I.putImageData(img, 0, 0);
+}
+
+/**
+ * 페이지 마커(섹션 탭) 텍스처. 오른쪽 마커는 캔버스 오른쪽, 왼쪽 마커는 캔버스 왼쪽이 책 바깥으로 나오는 부분이다.
+ * visFrac: 다 나왔을 때 보이는 부분의 비율 → 글자는 그 안에 쓴다.
+ */
+function drawMarker(g, w, h, label, isLeft, visFrac) {
+  const r = h * 0.12;
+  g.beginPath();
+  g.roundRect(2, 2, w - 4, h - 4, r);
+  const grad = g.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, '#f1e6c8');
+  grad.addColorStop(1, '#e3d3ab');
+  g.fillStyle = grad;
+  g.fill();
+  g.strokeStyle = 'rgba(110, 80, 40, 0.35)';
+  g.lineWidth = 3;
+  g.stroke();
+  // 바깥쪽 끝이 손때로 살짝 누렇게 바랜 느낌
+  const vx = isLeft ? 0 : w;
+  const edge = g.createLinearGradient(vx, 0, isLeft ? w * 0.25 : w * 0.75, 0);
+  edge.addColorStop(0, 'rgba(150, 110, 50, 0.22)');
+  edge.addColorStop(1, 'rgba(150, 110, 50, 0)');
+  g.fillStyle = edge;
+  g.fill();
+
+  const vis = w * Math.min(1, visFrac);
+  const cx = isLeft ? vis / 2 : w - vis / 2;
+  const lines = label.split('·').map((t) => t.trim()).filter(Boolean);
+  const size = Math.round(h * (lines.length > 1 ? 0.36 : 0.46));
+  g.font = `400 ${size}px ${BOOK_FONT}`;
+  g.fillStyle = INK;
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  const lh = size * 1.0;
+  lines.forEach((t, i) => g.fillText(t, cx, h / 2 + (i - (lines.length - 1) / 2) * lh, vis * 0.9));
 }
 
 /** g: 종이(이미지용), L: 잉크 레이어(글씨·선용) */

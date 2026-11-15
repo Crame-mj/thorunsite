@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { Globe } from './globe.js';
 import { Book } from './book.js';
-import { PEOPLE, BOOK_TITLE, COVER_TITLE } from './people.js';
+import { SECTIONS, BOOK_TITLE, COVER_TITLE } from './lexicon.js';
 import { CONTINENTS } from './continents.js';
 import { setupAudioPlayer } from './audio-player.js';
 
@@ -62,7 +62,7 @@ scene.add(globe.object);
 
 // 캔버스 텍스트에 웹폰트를 쓰려면 폰트가 먼저 로드돼야 한다. 실패/지연 시 기본 serif로 진행.
 // 개념서 내부 글씨(Nanum Pen Script)는 글자 범위별 파일로 나뉘어 있어서, 책에 쓰이는 글자를 넘겨 해당 파일만 미리 받는다.
-const BOOK_TEXT = `${BOOK_TITLE}0123456789${JSON.stringify(PEOPLE)}`;
+const BOOK_TEXT = `${BOOK_TITLE}0123456789 ${JSON.stringify(SECTIONS)}`;
 await Promise.race([
   Promise.all([
     document.fonts.load('400 32px "Nanum Pen Script"', BOOK_TEXT),
@@ -74,7 +74,7 @@ await Promise.race([
 ]);
 
 const book = await Book.create({
-  renderer, pageWidth: 1.3, pageHeight: 1.8, people: PEOPLE, title: BOOK_TITLE, coverTitle: COVER_TITLE, textures: BOOK_TEXTURES,
+  renderer, pageWidth: 1.3, pageHeight: 1.8, sections: SECTIONS, title: BOOK_TITLE, coverTitle: COVER_TITLE, textures: BOOK_TEXTURES,
 });
 scene.add(book.object);
 
@@ -93,7 +93,7 @@ function resize() {
   // 각 오브젝트가 화면에 여유 있게 들어오도록 필요한 카메라 거리 계산 (반폭/반높이 기준)
   fit.globeDist = Math.max(1.45 / t, 1.3 / (t * a));
   // 책은 기울어져 있어 앞쪽 모서리가 원근으로 커 보이므로 폭에 여유를 더 둔다
-  fit.bookDist = Math.max(1.05 / t, 1.7 / (t * a));
+  fit.bookDist = Math.max(1.05 / t, 1.85 / (t * a)); // 좌우로 튀어나온 페이지 마커까지 들어오도록
   // 화면 밖으로 밀어낼 거리: 더 먼 카메라 기준 보이는 반폭 + 오브젝트 크기
   const halfW = Math.max(fit.globeDist, fit.bookDist) * t * a;
   fit.offX = halfW + 1.6;
@@ -325,8 +325,11 @@ canvas.addEventListener('pointermove', (e) => {
   else if (dragOwner === 'book') book.pointerMove(e, camera, canvas.getBoundingClientRect());
   else if (e.pointerType === 'mouse') {
     // 핀 위에 마우스를 올리면 손가락 커서
-    const overPin = activeController() === 'globe' && !globe.isFocusing && globe.pick(toNdc(e), camera);
-    canvas.style.cursor = overPin ? 'pointer' : '';
+    // 지구본 핀이나 개념서 페이지 마커 위에 마우스를 올리면 손가락 커서
+    const c = activeController();
+    const overPin = c === 'globe' && !globe.isFocusing && globe.pick(toNdc(e), camera);
+    const overMarker = c === 'book' && book.markerAt(e, camera, canvas.getBoundingClientRect());
+    canvas.style.cursor = overPin || overMarker ? 'pointer' : '';
   }
 });
 
