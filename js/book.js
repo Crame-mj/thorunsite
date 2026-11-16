@@ -70,7 +70,8 @@ export class Book {
   static async create(opts) {
     const t = opts.textures ?? {};
     const [portraits, cover, paper, edge] = await Promise.all([
-      loadPortraits((opts.sections ?? []).flatMap((s) => s.pages).flatMap((p) => p.items ?? [])),
+      // 페이지에 들어갈 이미지(인물 초상화 + 본문 삽화)를 미리 불러온다
+      loadPortraits((opts.sections ?? []).flatMap((s) => s.pages).flatMap((p) => [...(p.items ?? []), ...(p.image ? [{ portrait: p.image }] : [])])),
       t.cover ? loadImage(t.cover) : null,
       t.paper ? loadImage(t.paper) : null,
       t.edge ? loadImage(t.edge) : null,
@@ -987,23 +988,7 @@ function drawPage(g, w, h, page, side, pageNo, portraits, paper) {
       const slotH = (h - pad - y) / 2;
       page.items.forEach((person, i) => drawEntry(g, L, person, left, y + slotH * i, right - left, slotH, portraits));
     } else {
-      L.textAlign = 'left';
-      if (page.heading) {
-        const hs = Math.round(w * 0.075);
-        L.font = `400 ${hs}px ${BOOK_FONT}`;
-        L.fillStyle = INK;
-        y += hs;
-        fillWrapped(L, page.heading, left, y, right - left, hs * 1.15, 2);
-        y += hs * 0.9;
-      }
-      if (page.body) {
-        const bs = Math.round(w * 0.056);
-        L.font = `400 ${bs}px ${BOOK_FONT}`;
-        L.fillStyle = INK;
-        const lh = bs * 1.4;
-        y += bs;
-        fillWrapped(L, page.body, left, y, right - left, lh, Math.max(1, Math.floor((h - pad - y) / lh)));
-      }
+      drawArticle(g, L, page, left, right, y, h - pad, w, portraits);
     }
   }
 
@@ -1107,6 +1092,96 @@ function drawMarker(g, w, h, label, isLeft, visFrac) {
   g.textBaseline = 'middle';
   const lh = size * 1.0;
   lines.forEach((t, i) => g.fillText(t, cx, h / 2 + (i - (lines.length - 1) / 2) * lh, vis * 0.9));
+}
+
+/**
+ * 글 페이지: 제목(title) → 부제(subtitle) → 삽화(image) → 본문(body) 순서로 위에서부터.
+ * 본문의 \n은 문단 구분 (문단 사이에 약간의 간격). 삽화는 남은 공간에 맞춰 크기가 정해진다.
+ */
+function drawArticle(g, L, page, left, right, top, bottom, w, images) {
+  const cw = right - left;
+  let y = top;
+  L.textAlign = 'left';
+  L.fillStyle = INK;
+
+  if (page.title) {
+    const size = Math.round(w * 0.105);
+    L.font = `400 ${size}px ${BOOK_FONT}`;
+    L.lineJoin = 'round';
+    L.lineWidth = size * 0.03; // 덧그어 굵게
+    L.strokeStyle = INK;
+    y += size * 0.85;
+    L.strokeText(page.title, left, y);
+    L.fillText(page.title, left, y);
+    y += size * 0.45;
+  }
+  if (page.subtitle) {
+    const size = Math.round(w * 0.072);
+    L.font = `400 ${size}px ${BOOK_FONT}`;
+    L.fillStyle = INK_SOFT;
+    L.lineWidth = size * 0.015;
+    L.strokeStyle = INK_SOFT;
+    y += size * 0.95;
+    L.strokeText(page.subtitle, left, y);
+    L.fillText(page.subtitle, left, y);
+    y += size * 0.5;
+    L.fillStyle = INK;
+  }
+
+  // 본문 줄 계산을 먼저 해서 삽화에 쓸 수 있는 높이를 정한다
+  const bs = Math.round(w * 0.053);
+  const lh = bs * 1.42;
+  const paraGap = lh * 0.55;
+  L.font = `400 ${bs}px ${BOOK_FONT}`;
+  const paras = page.body ? String(page.body).split('\n').map((t) => wrapLines(L, t, cw)) : [];
+  const bodyH = paras.reduce((sum, ls) => sum + ls.length * lh, 0) + Math.max(0, paras.length - 1) * paraGap;
+
+  const img = page.image ? images.get(page.image) : null;
+  if (img) {
+    const gap = w * 0.04;
+    const availH = bottom - y - bodyH - gap * 2;
+    const maxW = cw * (page.imageScale ?? 0.85);
+    const s = Math.min(maxW / img.naturalWidth, Math.max(availH, w * 0.25) / img.naturalHeight);
+    const iw = img.naturalWidth * s, ih = img.naturalHeight * s;
+    y += gap;
+    // 종이에 인쇄된 것처럼: 종이 위에 곱하기로 얹는다 (투명 배경은 그대로 종이가 보인다)
+    g.save();
+    g.globalCompositeOperation = 'multiply';
+    g.globalAlpha = 0.92;
+    g.drawImage(img, left + (cw - iw) / 2, y, iw, ih);
+    g.restore();
+    y += ih + gap;
+  } else if (page.title || page.subtitle) {
+    y += bs * 0.4;
+  }
+
+  L.font = `400 ${bs}px ${BOOK_FONT}`;
+  L.fillStyle = INK;
+  y += bs;
+  for (let p = 0; p < paras.length; p++) {
+    for (const line of paras[p]) {
+      if (y > bottom) return; // 페이지를 넘치는 내용은 잘린다
+      L.fillText(line, left, y);
+      y += lh;
+    }
+    y += paraGap;
+  }
+}
+
+/** 글자 단위 줄바꿈 결과를 줄 배열로 */
+function wrapLines(g, text, maxW) {
+  const lines = [];
+  let line = '';
+  for (const ch of String(text)) {
+    if (line && g.measureText(line + ch).width > maxW) {
+      lines.push(line.trimEnd());
+      line = ch.trimStart();
+    } else {
+      line += ch;
+    }
+  }
+  if (line) lines.push(line);
+  return lines;
 }
 
 /** g: 종이(이미지용), L: 잉크 레이어(글씨·선용) */
