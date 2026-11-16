@@ -20,7 +20,7 @@ export const BOOK_TITLE = '개념서';   // 책을 펼친 첫 장 제목
 export const COVER_TITLE = 'Lexicon'; // 표지 금박 글자
 
 export const SECTIONS = [
-  { id: 'world-concept', label: '세계관·개념', marker: 'left', pages: [] },
+  { id: 'world-concept', label: '세계관·개념', marker: 'left', pages: [{}, {}, {}, {}, {}, {}, {}, {}] },
   { id: 'world-region', label: '세계관·지역', marker: 'left', markerShift: -0.04, pages: [] },
   { id: 'world-race', label: '세계관·종족', marker: 'left', markerShift: -0.06, pages: [] },
   { id: 'people-upper', label: '인명록·상위', marker: 'right', pages: [] },

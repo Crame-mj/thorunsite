@@ -92,7 +92,7 @@ export class Book {
     this.coverTitle = coverTitle; // 표지에 금박으로 찍히는 글자 (첫 장 제목과 별도)
 
     // 첫 장(제목)은 오른쪽 페이지. 섹션은 항상 왼쪽 페이지(홀수 인덱스)에서 시작하도록 맞춘다.
-    const pages = [{ type: 'title', title }];
+    const pages = [{ type: 'section-title', section: title }]; // 첫 장도 섹션 첫 장과 같은 제목 양식
     this.sections = sections;
     this.sectionSpread = {};   // 섹션 id → 그 섹션 첫 페이지가 왼쪽에 펼쳐지는 spread 번호
     for (const s of sections) {
@@ -934,15 +934,7 @@ function drawPage(g, w, h, page, side, pageNo, portraits, paper) {
   L.fillStyle = INK;
   L.textBaseline = 'alphabetic';
 
-  if (page.type === 'title') {
-    L.textAlign = 'center';
-    L.font = `400 ${Math.round(w * 0.13)}px ${BOOK_FONT}`;
-    const cx = (left + right) / 2;
-    L.fillText(page.title, cx, h * 0.42);
-    L.strokeStyle = INK;
-    L.lineWidth = 2.5;
-    L.beginPath(); L.moveTo(cx - w * 0.15, h * 0.47); L.lineTo(cx + w * 0.15, h * 0.47); L.stroke();
-  } else if (page.type === 'section-title') {
+  if (page.type === 'section-title') {
     // 섹션 제목 장: 큰 제목('·' 앞) / 갈색 선 / 작은 부제('·' 뒤)
     const [main, sub] = page.section.split('·').map((t) => t.trim());
     const cx = (left + right) / 2;
