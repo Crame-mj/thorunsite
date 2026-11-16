@@ -1102,7 +1102,8 @@ function drawMarker(g, w, h, label, isLeft, visFrac) {
  */
 function drawArticle(g, L, page, left, right, top, bottom, w, images, facing) {
   const cw = right - left;
-  let y = top;
+  // 바깥 위 구석의 작은 섹션 이름과 겹치지 않도록 내용은 그보다 조금 아래에서 시작
+  let y = top + w * 0.035;
   L.textAlign = 'left';
   L.fillStyle = INK;
 
@@ -1130,13 +1131,25 @@ function drawArticle(g, L, page, left, right, top, bottom, w, images, facing) {
     L.fillStyle = INK;
   }
 
-  const bs = Math.round(w * 0.053);
-  const lh = bs * 1.42;
-  const paraGap = lh * 0.55;
+  let bs = Math.round(w * 0.053 * (page.bodySize ?? 1));
+  let lh = bs * 1.42;
+  let paraGap = lh * 0.55;
   L.font = `400 ${bs}px ${BOOK_FONT}`;
   const wrap = (p) => (p && p.body ? String(p.body).split('\n').map((t) => wrapLines(L, t, cw)) : []);
   const textH = (ps) => ps.reduce((sum, ls) => sum + ls.length * lh, 0) + Math.max(0, ps.length - 1) * paraGap;
-  const paras = wrap(page);
+  let paras = wrap(page);
+  // 삽화 없는 페이지: 본문이 넘치면 들어갈 때까지 글자를 조금씩 줄인다 (최소 원래 크기의 70%)
+  if (!page.image) {
+    const avail = bottom - y - bs * 1.4;
+    const minBs = bs * 0.7;
+    while (textH(paras) > avail && bs > minBs) {
+      bs = Math.round(bs * 0.95);
+      lh = bs * 1.42;
+      paraGap = lh * 0.55;
+      L.font = `400 ${bs}px ${BOOK_FONT}`;
+      paras = wrap(page);
+    }
+  }
   // 마주 보는 페이지도 삽화가 있으면 둘 중 긴 본문 기준으로 삽화 자리를 잡는다 → 양쪽 본문 시작 높이가 같아진다
   const bodyH = Math.max(textH(paras), facing && facing.image ? textH(wrap(facing)) : 0);
 
@@ -1177,12 +1190,15 @@ function drawArticle(g, L, page, left, right, top, bottom, w, images, facing) {
   }
 }
 
+const NO_LINE_START = '.,!?;:)]}」』〉》”’…·~、。';
+
 /** 글자 단위 줄바꿈 결과를 줄 배열로 */
 function wrapLines(g, text, maxW) {
   const lines = [];
   let line = '';
   for (const ch of String(text)) {
-    if (line && g.measureText(line + ch).width > maxW) {
+    // 마침표·쉼표 같은 문장부호는 줄 맨 앞에 혼자 내려가지 않고 앞 줄 끝에 붙인다
+    if (line && g.measureText(line + ch).width > maxW && !NO_LINE_START.includes(ch)) {
       lines.push(line.trimEnd());
       line = ch.trimStart();
     } else {
@@ -1241,7 +1257,7 @@ function fillWrapped(g, text, x, y, maxW, lineH, maxLines) {
   for (const para of String(text).split('\n')) {
     let line = '';
     for (const ch of para) {
-      if (line && g.measureText(line + ch).width > maxW) {
+      if (line && g.measureText(line + ch).width > maxW && !NO_LINE_START.includes(ch)) {
         lines.push(line);
         line = ch.trimStart();
       } else {
