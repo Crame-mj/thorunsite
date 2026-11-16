@@ -458,7 +458,7 @@ export class Book {
     const isLeft = isBlank ? key === 'blankL' : key % 2 === 1;
     const page = isBlank ? { type: 'blank' } : this.pages[key];
     const tex = this._canvasTex(this.Wp / this.H, (g, w, h) =>
-      drawPage(g, w, h, page, isLeft ? 'left' : 'right', isBlank ? null : key + 1, this.portraits, this.images.paper));
+      drawPage(g, w, h, page, isLeft ? 'left' : 'right', this._pageNumber(key), this.portraits, this.images.paper));
     if (isLeft) {
       // 왼쪽 페이지는 거울 배치(또는 뒷면)로 보이므로 UV를 뒤집어 바르게 보이게 한다.
       tex.repeat.x = -1;
@@ -466,6 +466,16 @@ export class Book {
     }
     cache.set(key, tex);
     return tex;
+  }
+
+  /**
+   * 화면에 적히는 쪽 번호. 첫 장 왼쪽(앞표지 안쪽 빈 면)이 0, '개념서' 제목 페이지가 1이고
+   * 이후 빈 페이지까지 포함해 차례대로 매긴다. 마지막 장 오른쪽 빈 면도 번호를 이어서 받는다.
+   */
+  _pageNumber(key) {
+    if (key === 'blankL') return 0;
+    if (key === 'blankR') return this.pages.length + 1;
+    return key + 1;
   }
 
   _trimCache(inUse) {
@@ -919,7 +929,8 @@ function drawPage(g, w, h, page, side, pageNo, portraits, paper) {
   g.fillStyle = eg;
   if (side === 'right') g.fillRect(w - w * 0.05, 0, w * 0.05, h); else g.fillRect(0, 0, w * 0.05, h);
 
-  if (page.type === 'blank') return;
+  // 빈 페이지도 쪽 번호는 적는다 (번호가 없는 빈 페이지만 여기서 끝)
+  if (page.type === 'blank' && pageNo == null) return;
 
   // 글씨와 선은 별도의 '잉크' 레이어에 그린 뒤, 종이 결과 얼룩을 입혀 종이에 스며든 것처럼 합성한다.
   // (초상화 이미지는 잉크가 아니므로 종이에 바로 그린다)
