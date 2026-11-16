@@ -600,7 +600,7 @@ export class Book {
       const i = counts[s.marker]++;
       // 마커는 종이 더미 '속'(윗면보다 약간 아래)에 끼워져 있다. 들어가 있을 땐 윗면 페이지와 단면에 가려 안 보이고,
       // 바깥으로 밀려 나오면 경사진 단면을 뚫고 나온 부분만 보인다.
-      const rnd = seededRandom(s.id);
+      const rnd = seededRandom(s.markerSeed ?? s.id);
       const jit = (amp) => (rnd() * 2 - 1) * amp;
       const depth = THREE.MathUtils.lerp(MARK_DEPTH[0], MARK_DEPTH[1], rnd());
       const tilt = THREE.MathUtils.degToRad(jit(MARK_JITTER_TILT));

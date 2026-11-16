@@ -9,6 +9,7 @@
 //   label  : 페이지 마커와 섹션 첫 페이지 머리말에 쓰이는 이름. '·' 앞뒤로 마커에서 두 줄로 나뉜다.
 //   marker : 'left' | 'right' — 페이지 마커가 책 왼쪽/오른쪽 중 어디에 붙는지 (위에서부터 순서대로)
 //   markerShift : (선택) 마커 위아래 위치 미세 조정. 음수면 아래로 (페이지 높이가 1.8 기준)
+//   markerSeed  : (선택) 마커 무작위 모양(기울기·깊이·폭)을 정하는 씨앗. 없으면 id를 쓴다.
 //   pages  : 섹션 첫 장 다음에 이어지는 내용 페이지 목록. 지금은 비어 있음 (첫 장만 있음).
 //
 // 페이지 형식 (모두 선택)
@@ -83,10 +84,11 @@ export const SECTIONS = [
       },
     ],
   },
-  { id: 'world-region', label: '세계관·지역', marker: 'left', markerShift: -0.04, pages: [] },
-  { id: 'world-race', label: '세계관·종족', marker: 'left', markerShift: -0.06, pages: [] },
+  // markerSeed: 마커의 기울기·깊이 등 무작위 모양을 정하는 값. 섹션 자리를 옮겼을 때 마커 모양은 그 자리 것을 유지하려고 넣었다.
+  { id: 'world-race', label: '세계관·종족', marker: 'left', markerShift: -0.04, markerSeed: 'world-region', pages: [] },
+  { id: 'monsters', label: '마물', marker: 'left', markerShift: -0.06, markerSeed: 'world-race', pages: [] },
   { id: 'people-upper', label: '인명록·상위', marker: 'right', pages: [] },
   { id: 'people-middle', label: '인명록·중위', marker: 'right', pages: [] },
   { id: 'people-lower', label: '인명록·하위', marker: 'right', pages: [] },
-  { id: 'monsters', label: '마물', marker: 'right', markerShift: -0.09, pages: [] },
+  { id: 'work-info', label: '작품 정보', marker: 'right', markerShift: -0.09, markerSeed: 'monsters', pages: [] },
 ];
