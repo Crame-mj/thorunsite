@@ -85,7 +85,17 @@ export const SECTIONS = [
     ],
   },
   // markerSeed: 마커의 기울기·깊이 등 무작위 모양을 정하는 값. 섹션 자리를 옮겼을 때 마커 모양은 그 자리 것을 유지하려고 넣었다.
-  { id: 'world-race', label: '세계관·종족', marker: 'left', markerShift: -0.04, markerSeed: 'world-region', pages: [] },
+  {
+    id: 'world-race', label: '세계관·종족', marker: 'left', markerShift: -0.04, markerSeed: 'world-region',
+    pages: [
+      {}, {}, // 14~15페이지
+      {}, {}, // 16~17페이지
+      {}, {}, // 18~19페이지
+      {}, {}, // 20~21페이지
+      {}, {}, // 22~23페이지
+      {}, {}, // 24~25페이지
+    ],
+  },
   { id: 'monsters', label: '마물', marker: 'left', markerShift: -0.06, markerSeed: 'world-race', pages: [] },
   { id: 'people-upper', label: '인명록·상위', marker: 'right', pages: [] },
   { id: 'people-middle', label: '인명록·중위', marker: 'right', pages: [] },
