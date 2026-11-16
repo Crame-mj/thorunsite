@@ -459,7 +459,8 @@ export class Book {
     const isLeft = isBlank ? key === 'blankL' : key % 2 === 1;
     const page = isBlank ? { type: 'blank' } : this.pages[key];
     const tex = this._canvasTex(this.Wp / this.H, (g, w, h) =>
-      drawPage(g, w, h, page, isLeft ? 'left' : 'right', this._pageNumber(key), this.portraits, this.images.paper));
+      drawPage(g, w, h, page, isLeft ? 'left' : 'right', this._pageNumber(key), this.portraits, this.images.paper,
+        isBlank ? null : this.pages[key % 2 ? key + 1 : key - 1]));
     if (isLeft) {
       // 왼쪽 페이지는 거울 배치(또는 뒷면)로 보이므로 UV를 뒤집어 바르게 보이게 한다.
       tex.repeat.x = -1;
@@ -908,7 +909,8 @@ function drawCover(g, w, h, title, leather) {
   g.restore();
 }
 
-function drawPage(g, w, h, page, side, pageNo, portraits, paper) {
+/** facing: 마주 보는 페이지 (삽화 크기를 맞추는 데 쓴다) */
+function drawPage(g, w, h, page, side, pageNo, portraits, paper, facing) {
   if (paper) {
     drawImageCover(g, paper, 0, 0, w, h);
   } else {
@@ -988,7 +990,7 @@ function drawPage(g, w, h, page, side, pageNo, portraits, paper) {
       const slotH = (h - pad - y) / 2;
       page.items.forEach((person, i) => drawEntry(g, L, person, left, y + slotH * i, right - left, slotH, portraits));
     } else {
-      drawArticle(g, L, page, left, right, y, h - pad, w, portraits);
+      drawArticle(g, L, page, left, right, y, h - pad, w, portraits, facing);
     }
   }
 
@@ -1098,7 +1100,7 @@ function drawMarker(g, w, h, label, isLeft, visFrac) {
  * 글 페이지: 제목(title) → 부제(subtitle) → 삽화(image) → 본문(body) 순서로 위에서부터.
  * 본문의 \n은 문단 구분 (문단 사이에 약간의 간격). 삽화는 남은 공간에 맞춰 크기가 정해진다.
  */
-function drawArticle(g, L, page, left, right, top, bottom, w, images) {
+function drawArticle(g, L, page, left, right, top, bottom, w, images, facing) {
   const cw = right - left;
   let y = top;
   L.textAlign = 'left';
@@ -1128,27 +1130,34 @@ function drawArticle(g, L, page, left, right, top, bottom, w, images) {
     L.fillStyle = INK;
   }
 
-  // 본문 줄 계산을 먼저 해서 삽화에 쓸 수 있는 높이를 정한다
   const bs = Math.round(w * 0.053);
   const lh = bs * 1.42;
   const paraGap = lh * 0.55;
   L.font = `400 ${bs}px ${BOOK_FONT}`;
-  const paras = page.body ? String(page.body).split('\n').map((t) => wrapLines(L, t, cw)) : [];
-  const bodyH = paras.reduce((sum, ls) => sum + ls.length * lh, 0) + Math.max(0, paras.length - 1) * paraGap;
+  const wrap = (p) => (p && p.body ? String(p.body).split('\n').map((t) => wrapLines(L, t, cw)) : []);
+  const textH = (ps) => ps.reduce((sum, ls) => sum + ls.length * lh, 0) + Math.max(0, ps.length - 1) * paraGap;
+  const paras = wrap(page);
+  // 마주 보는 페이지도 삽화가 있으면 둘 중 긴 본문 기준으로 삽화 자리를 잡는다 → 양쪽 본문 시작 높이가 같아진다
+  const bodyH = Math.max(textH(paras), facing && facing.image ? textH(wrap(facing)) : 0);
 
   const img = page.image ? images.get(page.image) : null;
   if (img) {
     const gap = w * 0.04;
-    const availH = bottom - y - bodyH - gap * 2;
+    // 삽화 자리 높이는 본문 길이와 상관없이 '남은 높이의 일정 비율'로 고정한다.
+    // 그래야 마주 보는 페이지끼리 본문 시작 높이가 맞는다. (본문이 길어 넘치면 아래가 잘린다)
+    const boxH = Math.min((bottom - y) * (page.imageHeight ?? 0.52), bottom - y - bodyH - gap * 2 - bs);
     const maxW = cw * (page.imageScale ?? 0.85);
-    const s = Math.min(maxW / img.naturalWidth, Math.max(availH, w * 0.25) / img.naturalHeight);
+    const s = Math.min(maxW / img.naturalWidth, boxH / img.naturalHeight);
     const iw = img.naturalWidth * s, ih = img.naturalHeight * s;
+    // imageSize: 그림만 작게 (자리는 그대로 차지 → 본문 높이는 다른 페이지와 같게, 줄어든 만큼 위쪽 여백이 늘어난다)
+    const k = page.imageSize ?? 1;
+    const dw = iw * k, dh = ih * k;
     y += gap;
     // 종이에 인쇄된 것처럼: 종이 위에 곱하기로 얹는다 (투명 배경은 그대로 종이가 보인다)
     g.save();
     g.globalCompositeOperation = 'multiply';
     g.globalAlpha = 0.92;
-    g.drawImage(img, left + (cw - iw) / 2, y, iw, ih);
+    g.drawImage(img, left + (cw - dw) / 2, y + (ih - dh), dw, dh);
     g.restore();
     y += ih + gap;
   } else if (page.title || page.subtitle) {
