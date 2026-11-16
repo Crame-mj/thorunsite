@@ -98,7 +98,9 @@ export class Book {
     for (const s of sections) {
       if (pages.length % 2 === 0) pages.push({ type: 'blank' });
       this.sectionSpread[s.id] = (pages.length + 1) / 2;
-      s.pages.forEach((p, i) => pages.push({ ...p, section: s.label, sectionStart: i === 0 }));
+      // 섹션 첫 장: 왼쪽은 빈 페이지, 오른쪽은 섹션 제목 페이지. 그 뒤로 섹션 내용 페이지들.
+      pages.push({ type: 'blank' }, { type: 'section-title', section: s.label });
+      s.pages.forEach((p) => pages.push({ ...p, section: s.label }));
     }
     if (pages.length % 2) pages.push({ type: 'blank' });
     this.pages = pages;
@@ -940,21 +942,38 @@ function drawPage(g, w, h, page, side, pageNo, portraits, paper) {
     L.strokeStyle = INK;
     L.lineWidth = 2.5;
     L.beginPath(); L.moveTo(cx - w * 0.15, h * 0.47); L.lineTo(cx + w * 0.15, h * 0.47); L.stroke();
+  } else if (page.type === 'section-title') {
+    // 섹션 제목 장: 큰 제목('·' 앞) / 갈색 선 / 작은 부제('·' 뒤)
+    const [main, sub] = page.section.split('·').map((t) => t.trim());
+    const cx = (left + right) / 2;
+    const mainSize = Math.round(w * 0.17);
+    L.textAlign = 'center';
+    L.font = `400 ${mainSize}px ${BOOK_FONT}`;
+    L.fillStyle = INK;
+    // 펜 글씨를 한 번 더 덧그어 굵고 진하게
+    L.lineJoin = 'round';
+    L.lineWidth = mainSize * 0.035;
+    L.strokeStyle = INK;
+    const mainY = sub ? h * 0.42 : h * 0.45;
+    L.strokeText(main, cx, mainY);
+    L.fillText(main, cx, mainY);
+    const lineY = mainY + mainSize * 0.45;
+    L.strokeStyle = 'rgba(150, 85, 45, 0.75)';
+    L.lineWidth = 2.5;
+    L.beginPath(); L.moveTo(cx - w * 0.11, lineY); L.lineTo(cx + w * 0.11, lineY); L.stroke();
+    if (sub) {
+      const subSize = Math.round(w * 0.1);
+      L.font = `400 ${subSize}px ${BOOK_FONT}`;
+      L.fillStyle = INK_SOFT;
+      L.strokeStyle = INK_SOFT;
+      L.lineWidth = subSize * 0.02;
+      L.strokeText(sub, cx, lineY + w * 0.14);
+      L.fillText(sub, cx, lineY + w * 0.14);
+    }
   } else {
     let y = pad;
-    // 섹션 첫 페이지: 섹션 이름 머리말 / 나머지 페이지: 바깥쪽 위에 작은 섹션 이름
-    if (page.sectionStart) {
-      const size = Math.round(w * 0.1);
-      L.textAlign = 'center';
-      L.font = `400 ${size}px ${BOOK_FONT}`;
-      const cx = (left + right) / 2;
-      L.fillText(page.section.replace('·', ' · '), cx, y + size * 0.8);
-      L.strokeStyle = INK_SOFT;
-      L.lineWidth = 2;
-      const ly = y + size * 1.25;
-      L.beginPath(); L.moveTo(cx - w * 0.22, ly); L.lineTo(cx + w * 0.22, ly); L.stroke();
-      y = ly + size * 0.6;
-    } else if (page.section) {
+    // 섹션 내용 페이지: 바깥쪽 위에 작은 섹션 이름
+    if (page.section) {
       L.font = `400 ${Math.round(w * 0.04)}px ${BOOK_FONT}`;
       L.fillStyle = INK_FADE;
       L.textAlign = side === 'right' ? 'right' : 'left';
