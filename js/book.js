@@ -1160,8 +1160,10 @@ function drawArticle(g, L, page, left, right, top, bottom, w, images, facing) {
     // 그래야 마주 보는 페이지끼리 본문 시작 높이가 맞는다. (본문이 길어 넘치면 아래가 잘린다)
     const boxH = Math.min((bottom - y) * (page.imageHeight ?? 0.52), bottom - y - bodyH - gap * 2 - bs);
     const maxW = cw * (page.imageScale ?? 0.85);
-    const s = Math.min(maxW / img.naturalWidth, boxH / img.naturalHeight);
-    const iw = img.naturalWidth * s, ih = img.naturalHeight * s;
+    // 투명한 캔버스 여백은 잘라내고 실제 그림 부분만 자리에 맞춘다
+    const c = contentBox(img);
+    const s = Math.min(maxW / c.w, boxH / c.h);
+    const iw = c.w * s, ih = c.h * s;
     // imageSize: 그림만 작게 (자리는 그대로 차지 → 본문 높이는 다른 페이지와 같게, 줄어든 만큼 위쪽 여백이 늘어난다)
     const k = page.imageSize ?? 1;
     const dw = iw * k, dh = ih * k;
@@ -1170,7 +1172,7 @@ function drawArticle(g, L, page, left, right, top, bottom, w, images, facing) {
     g.save();
     g.globalCompositeOperation = 'multiply';
     g.globalAlpha = 0.92;
-    g.drawImage(img, left + (cw - dw) / 2, y + (ih - dh), dw, dh);
+    g.drawImage(img, c.x, c.y, c.w, c.h, left + (cw - dw) / 2, y + (ih - dh), dw, dh);
     g.restore();
     y += ih + gap;
   } else if (page.title || page.subtitle) {
@@ -1188,6 +1190,40 @@ function drawArticle(g, L, page, left, right, top, bottom, w, images, facing) {
     }
     y += paraGap;
   }
+}
+
+/** 투명 배경 이미지에서 실제로 그려진 부분의 범위 (원본 px). 한 번 계산하면 캐시한다. */
+const _contentBoxes = new WeakMap();
+function contentBox(img) {
+  let box = _contentBoxes.get(img);
+  if (box) return box;
+  const W = img.naturalWidth, H = img.naturalHeight;
+  // 작게 줄여서 알파값만 훑는다 (속도용)
+  const k = Math.min(1, 300 / Math.max(W, H));
+  const cw = Math.max(1, Math.round(W * k)), ch = Math.max(1, Math.round(H * k));
+  const c = document.createElement('canvas');
+  c.width = cw; c.height = ch;
+  const g = c.getContext('2d', { willReadFrequently: true });
+  g.drawImage(img, 0, 0, cw, ch);
+  const a = g.getImageData(0, 0, cw, ch).data;
+  let x0 = cw, y0 = ch, x1 = -1, y1 = -1;
+  for (let y = 0; y < ch; y++) {
+    for (let x = 0; x < cw; x++) {
+      if (a[(y * cw + x) * 4 + 3] > 24) {
+        if (x < x0) x0 = x; if (x > x1) x1 = x;
+        if (y < y0) y0 = y; if (y > y1) y1 = y;
+      }
+    }
+  }
+  if (x1 < 0) box = { x: 0, y: 0, w: W, h: H }; // 전부 투명하거나 읽지 못하면 원본 그대로
+  else {
+    const pad = 2; // 축소 계산의 오차만큼 살짝 여유
+    const sx = Math.max(0, (x0 - pad) / k), sy = Math.max(0, (y0 - pad) / k);
+    const ex = Math.min(W, (x1 + 1 + pad) / k), ey = Math.min(H, (y1 + 1 + pad) / k);
+    box = { x: sx, y: sy, w: ex - sx, h: ey - sy };
+  }
+  _contentBoxes.set(img, box);
+  return box;
 }
 
 const NO_LINE_START = '.,!?;:)]}」』〉》”’…·~、。';
