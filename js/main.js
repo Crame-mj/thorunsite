@@ -233,6 +233,7 @@ function closePopup() {
   if (popup.hidden) return;
   popup.classList.remove('open');
   setTimeout(() => { popup.hidden = true; }, 300);
+  if (state.zoomTarget !== 0) bookSfx.playBack(); // 확대가 풀리는 순간에만
   state.zoomTarget = 0;
   globe.select(null);
   if (popupReturnFocus && document.contains(popupReturnFocus)) popupReturnFocus.focus({ preventScroll: true });
