@@ -147,6 +147,8 @@ function focusContinent(id) {
   if (activeController() !== 'globe' || globe.isFocusing || !popup.hidden) return;
   state.zoomTarget = 1;
   globe.focusOn(id, () => openPopup(id));
+  // 이미 거의 정면을 보고 있어서 회전이 거의 없으면 효과음은 생략
+  if (globe.lastFocusAngle > 0.15) bookSfx.playMove();
 }
 
 function setPopupImage(src, alt) {

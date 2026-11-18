@@ -133,6 +133,8 @@ export class Globe {
       0, 0, 0, 1,
     );
     const to = new THREE.Quaternion().setFromRotationMatrix(m);
+    // 돌아갈 각도(라디안). 이미 거의 정면이면 0에 가깝다.
+    this.lastFocusAngle = this.mesh.quaternion.angleTo(to);
     this._vel.x = this._vel.y = 0;
     this._drag = null;
     this._focus = { from: this.mesh.quaternion.clone(), to, t: 0, onDone };

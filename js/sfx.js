@@ -6,8 +6,9 @@
 const SRC = {
   drop: 'assets/audio/bookdrop.mp3',
   page: 'assets/audio/paperturn.mp3',
+  move: 'assets/audio/move.mp3', // 지구본이 대륙 위치로 자동 회전할 때
 };
-const VOLUME = { drop: 0.3, page: 0.3 };  // 고정 볼륨 (0~1)
+const VOLUME = { drop: 0.3, page: 0.3, move: 0.5 };  // 고정 볼륨 (0~1)
 
 const RATE_MIN = 0.4;     // 페이지 소리 재생 속도 범위 (1 = 원래 속도)
 const RATE_MAX = 2.4;
@@ -18,7 +19,7 @@ const PAGE_END = 0.95;    // 넘김 진행 100%가 효과음의 몇 % 지점에 
 
 export function createBookSfx() {
   const AC = window.AudioContext || window.webkitAudioContext;
-  if (!AC) return { update() {} };
+  if (!AC) return { update() {}, playMove() {} };
   const ctx = new AC();
   const master = ctx.createGain();
   master.connect(ctx.destination);
@@ -156,5 +157,8 @@ export function createBookSfx() {
     current.voice.follow(q * PAGE_END * buffers.page.duration, committed);
   }
 
-  return { update };
+  /** 지구본 자동 회전 시작 시 호출 */
+  function playMove() { playOnce('move'); }
+
+  return { update, playMove };
 }
