@@ -8,7 +8,7 @@ const SRC = {
   page: 'assets/audio/paperturn.mp3',
   move: 'assets/audio/move.mp3', // 지구본이 대륙 위치로 자동 회전할 때
 };
-const VOLUME = { drop: 0.3, page: 0.3, move: 0.5 };  // 고정 볼륨 (0~1)
+const VOLUME = { drop: 0.3, page: 0.3, move: 0.3 };  // 고정 볼륨 (0~1)
 
 const RATE_MIN = 0.4;     // 페이지 소리 재생 속도 범위 (1 = 원래 속도)
 const RATE_MAX = 2.4;
