@@ -5,6 +5,7 @@ import { SECTIONS, BOOK_TITLE, COVER_TITLE } from './lexicon.js';
 import { CONTINENTS } from './continents.js';
 import { setupAudioPlayer } from './audio-player.js';
 import { createBookSfx } from './sfx.js';
+import { setupMagnifier } from './magnifier.js';
 
 // 지구본 텍스처: 등장방형(equirectangular) 2:1 이미지
 // world-map-globe.webp는 원본(world-map.webp)을 극지방 왜곡이 덜하도록 재투영한 버전
@@ -80,6 +81,10 @@ const book = await Book.create({
 });
 scene.add(book.object);
 const bookSfx = createBookSfx();
+const lensTool = setupMagnifier({
+  icon: magnifier, sceneCanvas: canvas, bgVideo,
+  onChange: (on) => magnifier.classList.toggle('out', on), // 돋보기를 꺼내 쓰는 동안 아이콘은 숨김
+});
 
 // ------------------------------------------------------------------ 화면 맞춤
 
@@ -114,6 +119,7 @@ function setMode(mode) {
   document.body.dataset.mode = mode; // 오디오 플레이어 위치 이동(CSS)
   state.zoomTarget = 0;
   resetBookZoom();
+  if (mode !== 'book') lensTool.deactivate(); // 지구본 화면으로 가면 돋보기는 자동으로 끈다
   btnToBook.hidden = mode !== 'globe';
   btnToGlobe.hidden = mode !== 'book';
   continentList.hidden = mode !== 'globe';
@@ -467,6 +473,7 @@ function frame(now) {
   book.update(dt);
   bookSfx.update(book);
   renderer.render(scene, camera);
+  lensTool.render(); // 방금 그린 화면을 렌즈 안에 확대해서 그린다 (렌더 직후여야 캔버스 내용을 읽을 수 있다)
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
