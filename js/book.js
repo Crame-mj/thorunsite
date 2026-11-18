@@ -633,6 +633,9 @@ export class Book {
     this._markersWant = false;
   }
 
+  /** 페이지 마커가 나와 있어야 하는 상태인지 (책이 완전히 펼쳐짐). 돋보기 아이콘 등도 이 타이밍을 따른다. */
+  get markersShown() { return this._markersWant; }
+
   _updateMarkers(dtMs) {
     // 책이 완전히 펼쳐진 상태(표지 넘김 중 아님)에서만 마커를 내민다
     const want = this.coverOpen && !(this.flip && this.flip.kind === 'cover');

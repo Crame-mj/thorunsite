@@ -558,3 +558,31 @@ body[data-mode="book"] .site-logo {
 @media (prefers-reduced-motion: reduce) {
   .site-logo, body[data-mode="book"] .site-logo { animation: none; }
 }
+
+/* ------------------------------------------------------------ 개념서 돋보기 아이콘 */
+
+.magnifier {
+  position: fixed;
+  right: max(28px, env(safe-area-inset-right));
+  bottom: -2.2vw;                 /* 손잡이 끝은 화면 아래로 살짝 잘리게 */
+  z-index: 11;
+  width: clamp(110px, 10vw, 170px);
+  line-height: 0;
+  pointer-events: none;           /* 아직 버튼 기능 없음 */
+  filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.55));
+  /* 숨김: 화면 오른쪽 밖. 들어갈 때는 빠르게 (페이지 마커와 같은 타이밍) */
+  transform: translateX(calc(100% + 60px));
+  transition: transform 0.13s ease-in;
+}
+.magnifier img { width: 100%; height: auto; }
+.magnifier.show {
+  transform: none;
+  /* 나올 때는 페이지 마커처럼 잠깐 뒤에 스르르 감속하며 */
+  transition: transform 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.15s;
+}
+@media (max-width: 600px) {
+  .magnifier { width: 92px; right: 12px; bottom: -14px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .magnifier, .magnifier.show { transition: none; }
+}

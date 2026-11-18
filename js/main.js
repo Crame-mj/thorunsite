@@ -24,6 +24,7 @@ const btnToBook = document.getElementById('to-book');
 const btnToGlobe = document.getElementById('to-globe');
 const loading = document.getElementById('loading');
 const bgVideo = document.getElementById('bg');
+const magnifier = document.getElementById('magnifier');
 const continentList = document.getElementById('continent-list');
 document.body.dataset.mode = 'globe';
 setupAudioPlayer(document.getElementById('audio-player'));
@@ -459,6 +460,8 @@ function frame(now) {
   const zdir = Math.sign(state.zoomTarget - state.zoom);
   state.zoom = THREE.MathUtils.clamp(state.zoom + (zdir * dt) / ZOOM_MS, 0, 1);
   applyLayout();
+  // 돋보기: 개념서 화면에서 책이 완전히 펼쳐져 페이지 마커가 나올 때 함께 나오고, 덮으면 함께 들어간다
+  magnifier.classList.toggle('show', state.mode === 'book' && state.t === 1 && book.markersShown);
 
   globe.update(dt);
   book.update(dt);
