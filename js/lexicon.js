@@ -161,7 +161,19 @@ export const SECTIONS = [
       },
     ],
   },
-  { id: 'monsters', label: '마물', marker: 'left', markerShift: -0.06, markerSeed: 'world-race', pages: [] },
+  {
+    id: 'monsters', label: '마물', marker: 'left', markerShift: -0.06, markerSeed: 'world-race',
+    pages: [
+      {}, {}, // 28~29페이지
+      {}, {}, // 30~31페이지
+      {}, {}, // 32~33페이지
+      {}, {}, // 34~35페이지
+      {}, {}, // 36~37페이지
+      {}, {}, // 38~39페이지
+      {}, {}, // 40~41페이지
+      {}, {}, // 42~43페이지
+    ],
+  },
   { id: 'people-upper', label: '인명록·상위', marker: 'right', pages: [] },
   { id: 'people-middle', label: '인명록·중위', marker: 'right', pages: [] },
   { id: 'people-lower', label: '인명록·하위', marker: 'right', pages: [] },
