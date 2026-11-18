@@ -611,3 +611,6 @@ body.magnifier-dragging, body.magnifier-dragging * { cursor: grabbing !important
 @media (prefers-reduced-motion: reduce) {
   .magnifier, .magnifier.show { transition: none; }
 }
+
+/* 로고와 화면 이동 버튼(세계/개념서)은 돋보기(z-index 13)보다 위에 표시하고, 눌렀을 때도 버튼이 우선 */
+.site-logo, .nav-btn { z-index: 14; }

@@ -4,7 +4,7 @@
 //  - 아이콘이 있던 오른쪽 아래 구역에 놓으면(손을 뗐을 때만) 꺼지고 아이콘이 다시 나타난다.
 //  - 렌즈 확대는 3D 화면(캔버스)과 배경 영상을 그대로 확대해서 그린다. 로고·버튼 같은 화면 UI는 확대되지 않는다.
 
-const ZOOM = 1.5;              // 렌즈 확대율 (1.5 = 150%)
+const ZOOM = 2;                // 렌즈 확대율 (2 = 200%)
 const TOOL_SRC = 'assets/brand/magnifier-tool.webp';
 // 돋보기 이미지에서 렌즈(유리) 타원의 위치 — 이미지 크기 대비 비율
 const LENS = { cx: 0.618, cy: 0.385, rx: 0.319, ry: 0.301 };
@@ -40,7 +40,8 @@ export function setupMagnifier({ icon, sceneCanvas, bgVideo, onChange }) {
 
   function size() {
     const vw = window.innerWidth, vh = window.innerHeight;
-    st.w = Math.round(Math.min(Math.max(Math.min(vw, vh) * 0.42, 220), 380));
+    // 돋보기 크기: 화면 짧은 쪽의 60% (최소 280px, 최대 560px)
+    st.w = Math.round(Math.min(Math.max(Math.min(vw, vh) * 0.6, 280), 560));
     const ratio = img.naturalWidth ? img.naturalHeight / img.naturalWidth : 717 / 720;
     st.h = Math.round(st.w * ratio);
     tool.style.width = `${st.w}px`;
@@ -114,6 +115,8 @@ export function setupMagnifier({ icon, sceneCanvas, bgVideo, onChange }) {
   // 캔버스(책 넘기기)보다 먼저 받아서, 돋보기를 잡은 경우엔 책으로 전달되지 않게 한다
   document.addEventListener('pointerdown', (e) => {
     if (st.drag || !hits(e.clientX, e.clientY)) return;
+    // 돋보기보다 위에 표시되는 화면 UI(세계 버튼, 음악 플레이어 등)를 누른 경우엔 그 UI가 동작하게 둔다
+    if (e.target.closest?.('button, input, a, .audio-player')) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     e.stopPropagation();
