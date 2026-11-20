@@ -1424,13 +1424,15 @@ function drawIndex(L, page, left, right, top, w, facing) {
 function wrapLines(g, text, maxW) {
   const lines = [];
   let line = '';
-  for (const ch of String(text)) {
+  // 숫자·영문이 이어진 덩어리(예: 193cm)는 중간에서 끊지 않고 통째로 다음 줄로 넘긴다. 한글은 글자 단위.
+  const tokens = String(text).match(/[0-9A-Za-z.,%]+|[\s\S]/gu) ?? [];
+  for (const tk of tokens) {
     // 마침표·쉼표 같은 문장부호는 줄 맨 앞에 혼자 내려가지 않고 앞 줄 끝에 붙인다
-    if (line && g.measureText(line + ch).width > maxW && !NO_LINE_START.includes(ch)) {
+    if (line && g.measureText(line + tk).width > maxW && !NO_LINE_START.includes(tk[0])) {
       lines.push(line.trimEnd());
-      line = ch.trimStart();
+      line = tk.trimStart();
     } else {
-      line += ch;
+      line += tk;
     }
   }
   if (line) lines.push(line);
