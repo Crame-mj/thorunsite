@@ -271,7 +271,7 @@ export const SECTIONS = [
       // 46페이지 — 인물 소개 템플릿 (왼쪽)
       {
         title: '인물이름',
-        photo: null, // 인물 이미지 경로. 칸 크기는 고정이고 이미지는 칸에 맞춰 들어간다
+        photo: 'assets/lexicon/amon.webp', // 임시 이미지. 칸 크기는 고정이고 이미지는 칸에 맞춰 들어간다
         fields: [
           { label: '출생년/출생지', text: '제원전or제국력 000년/출생지' },
           { label: '성별/종족', text: '성별/종족' },

@@ -1151,15 +1151,17 @@ function drawMarker(g, w, h, label, isLeft, visFrac) {
  * 이미지 칸 크기는 이미지와 상관없이 항상 같다. 이미지는 칸 안에 비율을 유지한 채 맞춰 넣는다.
  * 항목 본문이 길어 페이지를 넘치면 글자가 조금씩 작아진다 (최소 70%).
  */
-const PHOTO_BOX = { w: 0.62, h: 0.5 }; // 이미지 칸: 글 폭 대비 폭, 폭 대비 높이 비율이 아니라 '페이지 폭 대비 높이'
+const PHOTO_BOX = { w: 0.82, h: 0.62 }; // 이미지 칸: w = 글 폭 대비 폭, h = 페이지 폭 대비 높이
+const PHOTO_PAGE_TEXT = 0.88;           // 이미지 칸이 있는 페이지는 글자를 이만큼 작게 (이미지 공간 확보)
 
 function drawProfile(g, L, page, left, right, top, bottom, w, images) {
   const cw = right - left;
   let y = top + w * 0.035;
   L.textAlign = 'left';
+  const ts = 'photo' in page ? PHOTO_PAGE_TEXT : 1;
 
   if (page.title) {
-    const size = Math.round(w * 0.105);
+    const size = Math.round(w * 0.105 * ts);
     L.font = `400 ${size}px ${BOOK_FONT}`;
     L.fillStyle = INK; L.strokeStyle = INK;
     L.lineJoin = 'round'; L.lineWidth = size * 0.03;
@@ -1182,20 +1184,17 @@ function drawProfile(g, L, page, left, right, top, bottom, w, images) {
       g.globalAlpha = 0.92;
       g.drawImage(img, c.x, c.y, c.w, c.h, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
       g.restore();
-    } else {
-      // 이미지가 아직 없으면 자리만 옅은 테두리로 표시
-      L.strokeStyle = 'rgba(61, 42, 26, 0.3)';
-      L.lineWidth = 2;
-      L.setLineDash([10, 8]);
-      L.strokeRect(bx, by, bw, bh);
-      L.setLineDash([]);
     }
+    // 이미지 칸 테두리: 갈색 실선
+    L.strokeStyle = 'rgba(120, 72, 38, 0.75)';
+    L.lineWidth = 3;
+    L.strokeRect(bx, by, bw, bh);
     y = by + bh + w * 0.02;
   }
 
   const fields = page.fields ?? [];
-  const subSize = Math.round(w * 0.066);
-  let bs = Math.round(w * 0.053);
+  const subSize = Math.round(w * 0.066 * ts);
+  let bs = Math.round(w * 0.053 * ts);
   const layout = () => {
     const lh = bs * 1.38;
     L.font = `400 ${bs}px ${BOOK_FONT}`;
