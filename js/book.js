@@ -1182,7 +1182,8 @@ function drawProfile(g, L, page, left, right, top, bottom, w, images) {
       g.save();
       g.globalCompositeOperation = 'multiply';
       g.globalAlpha = 0.92;
-      g.drawImage(img, c.x, c.y, c.w, c.h, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
+      // 가로는 가운데, 세로는 칸 아래쪽에 붙인다 (인물 이미지는 보통 아래가 잘려 있어서 바닥선에 닿아야 자연스럽다)
+      g.drawImage(img, c.x, c.y, c.w, c.h, bx + (bw - dw) / 2, by + bh - dh, dw, dh);
       g.restore();
     }
     // 이미지 칸 테두리: 갈색 실선
