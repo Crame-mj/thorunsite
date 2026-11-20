@@ -1275,10 +1275,10 @@ const NO_LINE_START = '.,!?;:)]}」』〉》”’…·~、。';
 
 /**
  * 목록 페이지: (제목) + 부제별 이름 칸. 이름은 한 줄에 INDEX_COLS명씩 칸을 나눠 배치하고,
- * 부제마다 INDEX_ROWS줄 분량의 자리를 미리 잡아 둔다 → 이름이 늘어나도 아래 부제 위치가 그대로이고,
- * 마주 보는 페이지와 부제 높이가 맞는다. (마주 보는 목록 페이지에만 제목이 있으면 그만큼 비워 둔다)
+ * 부제마다 INDEX_ROWS줄 분량의 자리를 미리 잡아 둔다 → 이름이 그 안에서 늘어나면 아래 부제 위치가 그대로다.
+ * 제목이 없는 페이지는 첫 부제가 바로 맨 위에서 시작한다.
  */
-const INDEX_COLS = 4;
+const INDEX_COLS = 3;
 const INDEX_ROWS = 3;
 const INDEX_LONGEST = '가나다라마바'; // 가장 긴 이름(한글 6자) 기준으로 글자 크기를 정한다 (더 긴 이름은 그 칸만 살짝 좁혀 쓴다)
 
@@ -1299,14 +1299,12 @@ function drawIndex(L, page, left, right, top, w, facing) {
     L.strokeText(page.title, left, y + titleSize * 0.85);
     L.fillText(page.title, left, y + titleSize * 0.85);
     y += titleBlock;
-  } else if (facing && facing.groups && facing.title) {
-    y += titleBlock;
   }
 
   const subSize = Math.round(w * 0.072);
   const colW = cw / INDEX_COLS;
   // 기준 길이 이름이 칸을 거의 꽉 채우는 크기 (부제보다는 작게)
-  let nameSize = Math.round(w * 0.07);
+  let nameSize = Math.round(w * 0.085);
   L.font = `400 ${nameSize}px ${BOOK_FONT}`;
   const longest = L.measureText(INDEX_LONGEST).width;
   if (longest > colW * 0.99) nameSize = Math.floor(nameSize * (colW * 0.99) / longest);
