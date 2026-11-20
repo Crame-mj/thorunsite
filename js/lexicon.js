@@ -21,6 +21,8 @@
 //     imageSize: 삽화만 작게 그리는 배율 (기본 1). 차지하는 자리는 그대로라 본문 위치는 변하지 않고, 줄어든 만큼 위쪽 여백이 늘어난다.
 //     body: 본문. \n은 문단 나눔. 삽화 없는 페이지에서 본문이 넘치면 글자가 자동으로 작아진다.
 //     bodySize: 본문 글자 크기 배율 (기본 1)
+//   { title, photo, fields: [ { label, text }, … ] }  인물 소개 페이지
+//     photo: 인물 이미지 경로 (고정 크기 칸에 맞춰 들어감, null이면 빈 칸 테두리만). fields: 부제(label) + 본문(text) 목록
 //   { title, groups: [ { subtitle, names: [이름, …] }, … ] }  목록 페이지 (부제마다 한 줄 3명씩 이름 칸) — 지금은 쓰지 않음
 //   { type: 'people', items: [ { name, title, description, portrait } , … ] }  인물 2명짜리 페이지
 //     portrait: 초상화 이미지 경로 (선택). 없으면 이름 첫 글자 자리표시자.
@@ -266,7 +268,25 @@ export const SECTIONS = [
   {
     id: 'people-upper', label: '인명록·상위', marker: 'right',
     pages: [
-      {}, {}, // 46~47페이지
+      // 46페이지 — 인물 소개 템플릿 (왼쪽)
+      {
+        title: '인물이름',
+        photo: null, // 인물 이미지 경로. 칸 크기는 고정이고 이미지는 칸에 맞춰 들어간다
+        fields: [
+          { label: '출생년/출생지', text: '제원전or제국력 000년/출생지' },
+          { label: '성별/종족', text: '성별/종족' },
+          { label: '가족관계', text: '가족관계' },
+        ],
+      },
+      // 47페이지 — 인물 소개 템플릿 (오른쪽)
+      {
+        fields: [
+          { label: '신분/직업', text: '신분/직업' },
+          { label: '외모', text: '외모' },
+          { label: '능력', text: '능력' },
+          { label: '특징', text: '특징' },
+        ],
+      },
       {}, {}, // 48~49페이지
       {}, {}, // 50~51페이지
       {}, {}, // 52~53페이지

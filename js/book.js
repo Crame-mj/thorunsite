@@ -71,7 +71,7 @@ export class Book {
     const t = opts.textures ?? {};
     const [portraits, cover, paper, edge] = await Promise.all([
       // 페이지에 들어갈 이미지(인물 초상화 + 본문 삽화)를 미리 불러온다
-      loadPortraits((opts.sections ?? []).flatMap((s) => s.pages).flatMap((p) => [...(p.items ?? []), ...(p.image ? [{ portrait: p.image }] : [])])),
+      loadPortraits((opts.sections ?? []).flatMap((s) => s.pages).flatMap((p) => [...(p.items ?? []), ...(p.image ? [{ portrait: p.image }] : []), ...(p.photo ? [{ portrait: p.photo }] : [])])),
       t.cover ? loadImage(t.cover) : null,
       t.paper ? loadImage(t.paper) : null,
       t.edge ? loadImage(t.edge) : null,
@@ -1034,7 +1034,8 @@ function drawPage(g, w, h, page, side, pageNo, portraits, paper, facing) {
       const slotH = (h - pad - y) / 2;
       page.items.forEach((person, i) => drawEntry(g, L, person, left, y + slotH * i, right - left, slotH, portraits));
     } else {
-      if (page.groups) drawIndex(L, page, left, right, y, w, facing);
+      if (page.fields) drawProfile(g, L, page, left, right, y, h - pad, w, portraits);
+      else if (page.groups) drawIndex(L, page, left, right, y, w, facing);
       else drawArticle(g, L, page, left, right, y, h - pad, w, portraits, facing);
     }
   }
@@ -1145,6 +1146,85 @@ function drawMarker(g, w, h, label, isLeft, visFrac) {
  * 글 페이지: 제목(title) → 부제(subtitle) → 삽화(image) → 본문(body) 순서로 위에서부터.
  * 본문의 \n은 문단 구분 (문단 사이에 약간의 간격). 삽화는 남은 공간에 맞춰 크기가 정해진다.
  */
+/**
+ * 인물 소개 페이지: (제목) → (고정 크기 인물 이미지 칸) → 항목들(부제 + 본문).
+ * 이미지 칸 크기는 이미지와 상관없이 항상 같다. 이미지는 칸 안에 비율을 유지한 채 맞춰 넣는다.
+ * 항목 본문이 길어 페이지를 넘치면 글자가 조금씩 작아진다 (최소 70%).
+ */
+const PHOTO_BOX = { w: 0.62, h: 0.5 }; // 이미지 칸: 글 폭 대비 폭, 폭 대비 높이 비율이 아니라 '페이지 폭 대비 높이'
+
+function drawProfile(g, L, page, left, right, top, bottom, w, images) {
+  const cw = right - left;
+  let y = top + w * 0.035;
+  L.textAlign = 'left';
+
+  if (page.title) {
+    const size = Math.round(w * 0.105);
+    L.font = `400 ${size}px ${BOOK_FONT}`;
+    L.fillStyle = INK; L.strokeStyle = INK;
+    L.lineJoin = 'round'; L.lineWidth = size * 0.03;
+    y += size * 0.85;
+    L.strokeText(page.title, left, y);
+    L.fillText(page.title, left, y);
+    y += size * 0.45;
+  }
+
+  if ('photo' in page) {
+    const bw = cw * PHOTO_BOX.w, bh = w * PHOTO_BOX.h;
+    const bx = left + (cw - bw) / 2, by = y + w * 0.02;
+    const img = page.photo ? images.get(page.photo) : null;
+    if (img) {
+      const c = contentBox(img);
+      const k = Math.min(bw / c.w, bh / c.h);
+      const dw = c.w * k, dh = c.h * k;
+      g.save();
+      g.globalCompositeOperation = 'multiply';
+      g.globalAlpha = 0.92;
+      g.drawImage(img, c.x, c.y, c.w, c.h, bx + (bw - dw) / 2, by + (bh - dh) / 2, dw, dh);
+      g.restore();
+    } else {
+      // 이미지가 아직 없으면 자리만 옅은 테두리로 표시
+      L.strokeStyle = 'rgba(61, 42, 26, 0.3)';
+      L.lineWidth = 2;
+      L.setLineDash([10, 8]);
+      L.strokeRect(bx, by, bw, bh);
+      L.setLineDash([]);
+    }
+    y = by + bh + w * 0.02;
+  }
+
+  const fields = page.fields ?? [];
+  const subSize = Math.round(w * 0.066);
+  let bs = Math.round(w * 0.053);
+  const layout = () => {
+    const lh = bs * 1.38;
+    L.font = `400 ${bs}px ${BOOK_FONT}`;
+    const items = fields.map((f) => ({ label: f.label, lines: String(f.text ?? '').split('\n').flatMap((t) => wrapLines(L, t, cw)) }));
+    const height = items.reduce((sum, it) => sum + subSize * 1.35 + it.lines.length * lh + bs * 0.55, 0);
+    return { items, lh, height };
+  };
+  let lay = layout();
+  const minBs = bs * 0.7;
+  while (lay.height > bottom - y && bs > minBs) { bs = Math.round(bs * 0.95); lay = layout(); }
+
+  for (const it of lay.items) {
+    L.font = `400 ${subSize}px ${BOOK_FONT}`;
+    L.fillStyle = INK_SOFT; L.strokeStyle = INK_SOFT; L.lineWidth = subSize * 0.015;
+    y += subSize * 1.05;
+    L.strokeText(it.label, left, y);
+    L.fillText(it.label, left, y);
+    y += subSize * 0.3;
+    L.font = `400 ${bs}px ${BOOK_FONT}`;
+    L.fillStyle = INK;
+    for (const line of it.lines) {
+      y += lay.lh;
+      if (y > bottom) return;
+      L.fillText(line, left, y);
+    }
+    y += bs * 0.55;
+  }
+}
+
 function drawArticle(g, L, page, left, right, top, bottom, w, images, facing) {
   const cw = right - left;
   // 바깥 위 구석의 작은 섹션 이름과 겹치지 않도록 내용은 그보다 조금 아래에서 시작
