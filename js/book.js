@@ -1280,10 +1280,12 @@ const NO_LINE_START = '.,!?;:)]}」』〉》”’…·~、。';
  */
 const INDEX_COLS = 4;
 const INDEX_ROWS = 3;
-const INDEX_LONGEST = '가나다라마바사'; // 가장 긴 이름(한글 7자) 기준으로 글자 크기를 정한다
+const INDEX_LONGEST = '가나다라마바'; // 가장 긴 이름(한글 6자) 기준으로 글자 크기를 정한다 (더 긴 이름은 그 칸만 살짝 좁혀 쓴다)
 
 function drawIndex(L, page, left, right, top, w, facing) {
-  const cw = right - left;
+  // 이름 칸은 페이지 여백을 조금 더 써서 넓게 (부제·제목 위치는 다른 페이지와 같게 둔다)
+  const nameLeft = left - w * 0.045, nameRight = right + w * 0.045;
+  const cw = nameRight - nameLeft;
   let y = top + w * 0.035;
   const titleSize = Math.round(w * 0.105);
   const titleBlock = titleSize * 1.3;
@@ -1303,12 +1305,12 @@ function drawIndex(L, page, left, right, top, w, facing) {
 
   const subSize = Math.round(w * 0.072);
   const colW = cw / INDEX_COLS;
-  // 가장 긴 이름이 칸 안에 여유 있게 들어가는 크기 (최대 본문 크기)
-  let nameSize = Math.round(w * 0.053);
+  // 기준 길이 이름이 칸을 거의 꽉 채우는 크기 (부제보다는 작게)
+  let nameSize = Math.round(w * 0.07);
   L.font = `400 ${nameSize}px ${BOOK_FONT}`;
   const longest = L.measureText(INDEX_LONGEST).width;
-  if (longest > colW * 0.9) nameSize = Math.floor(nameSize * (colW * 0.9) / longest);
-  const rowH = nameSize * 1.75;
+  if (longest > colW * 0.99) nameSize = Math.floor(nameSize * (colW * 0.99) / longest);
+  const rowH = nameSize * 1.45;
 
   for (const group of page.groups) {
     // 부제
@@ -1324,7 +1326,7 @@ function drawIndex(L, page, left, right, top, w, facing) {
     L.strokeStyle = 'rgba(150, 85, 45, 0.45)';
     L.lineWidth = 2;
     L.beginPath(); L.moveTo(left, y); L.lineTo(right, y); L.stroke();
-    y += nameSize * 0.6;
+    y += nameSize * 0.35;
 
     // 이름 칸 (칸 가운데 정렬)
     L.font = `400 ${nameSize}px ${BOOK_FONT}`;
@@ -1334,7 +1336,7 @@ function drawIndex(L, page, left, right, top, w, facing) {
     const rows = Math.max(INDEX_ROWS, Math.ceil(names.length / INDEX_COLS));
     names.forEach((name, i) => {
       const r = Math.floor(i / INDEX_COLS), c = i % INDEX_COLS;
-      L.fillText(name, left + colW * (c + 0.5), y + rowH * r + nameSize, colW * 0.96);
+      L.fillText(name, nameLeft + colW * (c + 0.5), y + rowH * r + nameSize, colW * 0.99);
     });
     L.textAlign = 'left';
     y += rowH * rows + subSize * 0.4;
