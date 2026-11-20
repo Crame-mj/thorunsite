@@ -1034,7 +1034,8 @@ function drawPage(g, w, h, page, side, pageNo, portraits, paper, facing) {
       const slotH = (h - pad - y) / 2;
       page.items.forEach((person, i) => drawEntry(g, L, person, left, y + slotH * i, right - left, slotH, portraits));
     } else {
-      drawArticle(g, L, page, left, right, y, h - pad, w, portraits, facing);
+      if (page.groups) drawIndex(L, page, left, right, y, w, facing);
+      else drawArticle(g, L, page, left, right, y, h - pad, w, portraits, facing);
     }
   }
 
@@ -1271,6 +1272,74 @@ function contentBox(img) {
 }
 
 const NO_LINE_START = '.,!?;:)]}」』〉》”’…·~、。';
+
+/**
+ * 목록 페이지: (제목) + 부제별 이름 칸. 이름은 한 줄에 INDEX_COLS명씩 칸을 나눠 배치하고,
+ * 부제마다 INDEX_ROWS줄 분량의 자리를 미리 잡아 둔다 → 이름이 늘어나도 아래 부제 위치가 그대로이고,
+ * 마주 보는 페이지와 부제 높이가 맞는다. (마주 보는 목록 페이지에만 제목이 있으면 그만큼 비워 둔다)
+ */
+const INDEX_COLS = 4;
+const INDEX_ROWS = 3;
+const INDEX_LONGEST = '가나다라마바사'; // 가장 긴 이름(한글 7자) 기준으로 글자 크기를 정한다
+
+function drawIndex(L, page, left, right, top, w, facing) {
+  const cw = right - left;
+  let y = top + w * 0.035;
+  const titleSize = Math.round(w * 0.105);
+  const titleBlock = titleSize * 1.3;
+  L.textAlign = 'left';
+  if (page.title) {
+    L.font = `400 ${titleSize}px ${BOOK_FONT}`;
+    L.fillStyle = INK;
+    L.strokeStyle = INK;
+    L.lineJoin = 'round';
+    L.lineWidth = titleSize * 0.03;
+    L.strokeText(page.title, left, y + titleSize * 0.85);
+    L.fillText(page.title, left, y + titleSize * 0.85);
+    y += titleBlock;
+  } else if (facing && facing.groups && facing.title) {
+    y += titleBlock;
+  }
+
+  const subSize = Math.round(w * 0.072);
+  const colW = cw / INDEX_COLS;
+  // 가장 긴 이름이 칸 안에 여유 있게 들어가는 크기 (최대 본문 크기)
+  let nameSize = Math.round(w * 0.053);
+  L.font = `400 ${nameSize}px ${BOOK_FONT}`;
+  const longest = L.measureText(INDEX_LONGEST).width;
+  if (longest > colW * 0.9) nameSize = Math.floor(nameSize * (colW * 0.9) / longest);
+  const rowH = nameSize * 1.75;
+
+  for (const group of page.groups) {
+    // 부제
+    L.font = `400 ${subSize}px ${BOOK_FONT}`;
+    L.fillStyle = INK_SOFT;
+    L.strokeStyle = INK_SOFT;
+    L.lineWidth = subSize * 0.015;
+    y += subSize * 0.95;
+    L.strokeText(group.subtitle, left, y);
+    L.fillText(group.subtitle, left, y);
+    // 부제 밑 옅은 선
+    y += subSize * 0.35;
+    L.strokeStyle = 'rgba(150, 85, 45, 0.45)';
+    L.lineWidth = 2;
+    L.beginPath(); L.moveTo(left, y); L.lineTo(right, y); L.stroke();
+    y += nameSize * 0.6;
+
+    // 이름 칸 (칸 가운데 정렬)
+    L.font = `400 ${nameSize}px ${BOOK_FONT}`;
+    L.fillStyle = INK;
+    L.textAlign = 'center';
+    const names = group.names ?? [];
+    const rows = Math.max(INDEX_ROWS, Math.ceil(names.length / INDEX_COLS));
+    names.forEach((name, i) => {
+      const r = Math.floor(i / INDEX_COLS), c = i % INDEX_COLS;
+      L.fillText(name, left + colW * (c + 0.5), y + rowH * r + nameSize, colW * 0.96);
+    });
+    L.textAlign = 'left';
+    y += rowH * rows + subSize * 0.4;
+  }
+}
 
 /** 글자 단위 줄바꿈 결과를 줄 배열로 */
 function wrapLines(g, text, maxW) {
