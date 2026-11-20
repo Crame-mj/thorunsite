@@ -270,14 +270,14 @@ export const SECTIONS = [
       {
         title: '목록 일람',
         groups: [
-          { subtitle: '천사', names: [] },
-          { subtitle: '요정', names: [] },
+          { subtitle: '천사', names: ['사리엘', '사마엘'] },
+          { subtitle: '요정', names: ['오베론'] },
         ],
       },
       // 47페이지
       {
         groups: [
-          { subtitle: '악마', names: [] },
+          { subtitle: '악마', names: ['아몬', '말파스', '시트리'] },
           { subtitle: '외신', names: ['텔리시엘', '아스테론', '엘레라그실', '마네모', '네프라티스', '해그니어', '에우랄레나'] },
         ],
       },
