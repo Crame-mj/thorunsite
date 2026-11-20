@@ -262,7 +262,25 @@ export const SECTIONS = [
       },
     ],
   },
-  { id: 'people-upper', label: '인명록·상위', marker: 'right', pages: [] },
+  {
+    id: 'people-upper', label: '인명록·상위', marker: 'right',
+    pages: [
+      {}, {}, // 46~47페이지
+      {}, {}, // 48~49페이지
+      {}, {}, // 50~51페이지
+      {}, {}, // 52~53페이지
+      {}, {}, // 54~55페이지
+      {}, {}, // 56~57페이지
+      {}, {}, // 58~59페이지
+      {}, {}, // 60~61페이지
+      {}, {}, // 62~63페이지
+      {}, {}, // 64~65페이지
+      {}, {}, // 66~67페이지
+      {}, {}, // 68~69페이지
+      {}, {}, // 70~71페이지
+      {}, {}, // 72~73페이지
+    ],
+  },
   { id: 'people-middle', label: '인명록·중위', marker: 'right', pages: [] },
   { id: 'people-lower', label: '인명록·하위', marker: 'right', pages: [] },
   { id: 'work-info', label: '작품 정보', marker: 'right', markerShift: -0.09, markerSeed: 'monsters', pages: [] },
