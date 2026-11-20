@@ -614,3 +614,24 @@ body.magnifier-dragging, body.magnifier-dragging * { cursor: grabbing !important
 
 /* 로고와 화면 이동 버튼(세계/개념서)은 돋보기(z-index 13)보다 위에 표시하고, 눌렀을 때도 버튼이 우선 */
 .site-logo, .nav-btn { z-index: 14; }
+
+/* ------------------------------------------------------------ 돋보기 아이콘 발광효과 */
+/* 같은 그림을 뒤에 한 장 더 깔고 금빛 그림자만 보이게 한 뒤, 그 층의 밝기를 천천히 오르내린다 */
+.magnifier { position: fixed; }
+.magnifier img:not(.magnifier-glow) { position: relative; }
+.magnifier-glow {
+  position: absolute;
+  inset: 0;
+  filter: drop-shadow(0 0 6px #f6cf72) drop-shadow(0 0 14px rgba(242, 196, 99, 0.85));
+  opacity: 0;
+  transition: opacity 0.5s;
+  pointer-events: none;
+}
+.magnifier.glow .magnifier-glow { animation: icon-glow 2.6s ease-in-out infinite; }
+@keyframes icon-glow {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .magnifier.glow .magnifier-glow { animation: none; opacity: 0.7; }
+}

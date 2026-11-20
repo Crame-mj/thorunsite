@@ -31,7 +31,10 @@
 
   <!-- 사이트 로고: 지구본 화면은 좌상단, 개념서 화면은 우상단 (모바일은 상단 가운데) -->
   <!-- 돋보기 아이콘: 개념서가 완전히 펼쳐지면 오른쪽 밖에서 미끄러져 들어온다. 끌면 실제 돋보기가 나온다 (js/magnifier.js) -->
-  <div id="magnifier" class="magnifier" aria-hidden="true"><img src="assets/brand/magnifier.webp" alt="" width="480" height="468" decoding="async"></div>
+  <div id="magnifier" class="magnifier" aria-hidden="true">
+    <img class="magnifier-glow" src="assets/brand/magnifier.webp" alt="" width="480" height="468" decoding="async">
+    <img src="assets/brand/magnifier.webp" alt="" width="480" height="468" decoding="async">
+  </div>
 
   <h1 class="site-logo"><img src="assets/brand/logo.webp" alt="Thorun" width="900" height="367" decoding="async"></h1>
 

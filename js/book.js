@@ -129,6 +129,7 @@ export class Book {
     this._buildSpine();
     this._buildLeaf();
     this._buildMarkers();
+    this._buildGlow();
 
     this._applyCover(true);
     this._refreshTextures();
@@ -635,6 +636,46 @@ export class Book {
 
   /** 페이지 마커가 나와 있어야 하는 상태인지 (책이 완전히 펼쳐짐). 돋보기 아이콘 등도 이 타이밍을 따른다. */
   get markersShown() { return this._markersWant; }
+
+  /** 책이 완전히 덮인 채 아무 조작도 없는 상태인지 (발광효과 조건) */
+  get isClosedIdle() {
+    return !this.coverOpen && !this.flip && this.coverP === 0 && !this._drag && !this._auto;
+  }
+
+  /** 발광효과: 덮인 책 밑에 금빛 판을 깔아서, 책 테두리 바깥으로만 빛이 번져 보이게 한다 */
+  _buildGlow() {
+    const pad = 0.32; // 책 바깥으로 빛이 번지는 폭
+    const w = this.Wc + pad * 2, h = this.Hc + pad * 2;
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = Math.round(512 * h / w);
+    const g = c.getContext('2d');
+    const k = c.width / w;
+    // 그림자 번짐으로 부드러운 빛을 만든다 (사각형 자체는 캔버스 밖에 그리고 그림자만 안으로)
+    g.shadowColor = '#ffd27a';
+    g.shadowBlur = pad * k * 0.9;
+    g.shadowOffsetX = c.width * 2;
+    g.fillStyle = '#000';
+    const r = 0.04 * k;
+    g.beginPath();
+    g.roundRect(pad * k - c.width * 2, pad * k, this.Wc * k, this.Hc * k, r);
+    g.fill();
+    g.fill(); // 두 번 겹쳐 가장자리를 조금 더 진하게
+    const tex = new THREE.CanvasTexture(c);
+    this.glowMat = new THREE.MeshBasicMaterial({
+      map: tex, color: 0xf2c463, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    this.glow = new THREE.Mesh(new THREE.PlaneGeometry(w, h), this.glowMat);
+    this.glow.position.set(this.Wc / 2, 0, -COVER_T - 0.004); // 닫힌 책 바로 밑
+    this.glow.visible = false;
+    this.inner.add(this.glow);
+  }
+
+  /** 발광효과 세기 (0이면 꺼짐) */
+  setGlow(v) {
+    this.glowMat.opacity = Math.min(1, v);
+    this.glow.visible = v > 0.002;
+  }
 
   _updateMarkers(dtMs) {
     // 책이 완전히 펼쳐진 상태(표지 넘김 중 아님)에서만 마커를 내민다

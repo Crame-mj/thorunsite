@@ -34,6 +34,30 @@ export class Globe {
       .premultiply(new THREE.Quaternion().setFromAxisAngle(AXIS_X, 0.35));
     this.object.add(this.mesh);
 
+    // 발광효과: 지구본 뒤에 카메라를 향한 판을 깔고, 지구본 가장자리부터 바깥으로 옅어지는 금빛 고리를 그린다.
+    // (지구본이 앞을 가리므로 테두리 바깥으로 번지는 부분만 보인다. setGlow로 세기 조절)
+    const GLOW_R = 1.4; // 판 반지름 (지구본 반지름 대비)
+    const gc = document.createElement('canvas');
+    gc.width = gc.height = 512;
+    const gg = gc.getContext('2d');
+    const grad = gg.createRadialGradient(256, 256, 0, 256, 256, 256);
+    const at = (r) => r / GLOW_R; // 지구본 반지름 기준 위치 → 그라데이션 위치
+    grad.addColorStop(0, 'rgba(255,255,255,0)');
+    grad.addColorStop(at(0.96), 'rgba(255,255,255,0)');
+    grad.addColorStop(at(1.0), 'rgba(255,255,255,0.9)');
+    grad.addColorStop(at(1.06), 'rgba(255,255,255,0.45)');
+    grad.addColorStop(at(1.18), 'rgba(255,255,255,0.12)');
+    grad.addColorStop(1, 'rgba(255,255,255,0)');
+    gg.fillStyle = grad;
+    gg.fillRect(0, 0, 512, 512);
+    this.glowMat = new THREE.MeshBasicMaterial({
+      map: new THREE.CanvasTexture(gc), color: 0xf2c463, transparent: true, opacity: 0,
+      blending: THREE.AdditiveBlending, depthWrite: false,
+    });
+    this.glow = new THREE.Mesh(new THREE.PlaneGeometry(radius * GLOW_R * 2, radius * GLOW_R * 2), this.glowMat);
+    this.glow.visible = false;
+    this.object.add(this.glow);
+
     this._drag = null;          // { id, x, y, t }
     this._vel = { x: 0, y: 0 }; // rad/ms
     this._qa = new THREE.Quaternion();
@@ -67,6 +91,14 @@ export class Globe {
 
   get isDragging() { return this._drag !== null; }
   get isFocusing() { return this._focus !== null; }
+  /** 손으로 굴린 관성으로 아직 돌고 있는지 */
+  get isMoving() { return Math.abs(this._vel.x) > 2e-5 || Math.abs(this._vel.y) > 2e-5; }
+
+  /** 발광효과 세기 (0이면 꺼짐) */
+  setGlow(v) {
+    this.glowMat.opacity = Math.min(1, v);
+    this.glow.visible = v > 0.002;
+  }
 
   /** 대륙마다 핀을 꽂는다. items: [{ id, lat, lon }] */
   addPins(items) {

@@ -454,6 +454,32 @@ window.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowLeft') book.prev();
 });
 
+// ------------------------------------------------------------------ 발광효과
+// 조작할 수 있는 대상이 가만히 있을 때 테두리가 금빛으로 느리게 밝아졌다 옅어진다.
+
+const GLOW_PERIOD = 2600;    // 한 번 밝아졌다 옅어지는 주기 (ms)
+const GLOW_FADE = 500;       // 조건이 바뀔 때 켜지고 꺼지는 시간 (ms)
+const ICON_IN_MS = 800;      // 돋보기 아이콘이 다 들어오기까지 (CSS 0.15s 지연 + 0.6s 이동)
+const glow = { globe: 0, book: 0, iconSince: null };
+
+function updateGlow(now, dt) {
+  const globeOn = state.mode === 'globe' && state.t === 0 && state.zoom === 0 && state.zoomTarget === 0
+    && popup.hidden && !globe.isDragging && !globe.isFocusing && !globe.isMoving;
+  const bookOn = state.mode === 'book' && state.t === 1 && book.isClosedIdle;
+  const step = dt / GLOW_FADE;
+  glow.globe = THREE.MathUtils.clamp(glow.globe + (globeOn ? step : -step * 2), 0, 1);
+  glow.book = THREE.MathUtils.clamp(glow.book + (bookOn ? step : -step * 2), 0, 1);
+  const pulse = 0.35 + 0.65 * (0.5 - 0.5 * Math.cos((now / GLOW_PERIOD) * Math.PI * 2));
+  globe.setGlow(glow.globe * pulse * 0.9);
+  book.setGlow(glow.book * pulse * 0.85);
+
+  // 돋보기 아이콘: 완전히 들어와 자리 잡은 뒤부터, 실제 돋보기를 꺼내면 꺼짐
+  const shown = magnifier.classList.contains('show') && !magnifier.classList.contains('out');
+  if (!shown) glow.iconSince = null;
+  else if (glow.iconSince === null) glow.iconSince = now;
+  magnifier.classList.toggle('glow', shown && now - glow.iconSince >= ICON_IN_MS);
+}
+
 // ------------------------------------------------------------------ 루프
 
 let last = performance.now();
@@ -468,6 +494,7 @@ function frame(now) {
   applyLayout();
   // 돋보기: 개념서 화면에서 책이 완전히 펼쳐져 페이지 마커가 나올 때 함께 나오고, 덮으면 함께 들어간다
   magnifier.classList.toggle('show', state.mode === 'book' && state.t === 1 && book.markersShown);
+  updateGlow(now, dt);
 
   globe.update(dt);
   book.update(dt);
