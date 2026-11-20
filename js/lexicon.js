@@ -296,7 +296,18 @@ export const SECTIONS = [
   {
     id: 'people-upper', label: '인명록·상위', marker: 'right',
     pages: [
-      ...profile({ photo: 'assets/lexicon/amon.webp' }), // 46~47페이지 (임시 이미지)
+      // 46~47페이지
+      ...profile({
+        name: '아몬',
+        photo: 'assets/lexicon/amon.webp',
+        birth: '제국력 89년/아샤돈(텐트라)',
+        genderRace: '여성/악마',
+        family: '-',
+        status: '대악마/군주(텐트라)',
+        appearance: '흑색의 긴 곱슬 머리, 적색 눈동자, 172cm의 키, 육감적인 체형, 풍만한 가슴, 한 쌍의 적색 뿔, 한 쌍의 적색 피막 날개',
+        ability: '불 마법, 정신 조작, 촉수 조종',
+        traits: '텐트라의 지도자로, 영토 관리는 대부분 미리 길러둔 촉수를 이용하며 본인은 세상 곳곳을 돌아다니면서 각종 문제를 일으키고 다닌다. 낮에는 남의 영토에 침범해 테러 행각을 벌이고, 밤에는 먹음직스러운 인물을 찾아 정기를 빨아낸 뒤 도망친다. 사악한 장난을 즐기며, 지루한 것을 가장 싫어한다.',
+      }),
       ...profile(), // 48~49페이지
       ...profile(), // 50~51페이지
       ...profile(), // 52~53페이지
