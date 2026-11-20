@@ -299,7 +299,20 @@ export const SECTIONS = [
   {
     id: 'people-middle', label: '인명록·중위', marker: 'right',
     pages: [
-      {}, {}, // 76~77페이지
+      // 76페이지 — 목록
+      {
+        title: '목록 일람',
+        groups: [
+          { subtitle: '엘프', names: [] },
+          { subtitle: '드워프', names: [] },
+        ],
+      },
+      // 77페이지
+      {
+        groups: [
+          { subtitle: '인간', names: [] },
+        ],
+      },
       {}, {}, // 78~79페이지
       {}, {}, // 80~81페이지
       {}, {}, // 82~83페이지
@@ -336,7 +349,21 @@ export const SECTIONS = [
   {
     id: 'people-lower', label: '인명록·하위', marker: 'right',
     pages: [
-      {}, {}, // 142~143페이지
+      // 142페이지 — 목록
+      {
+        title: '목록 일람',
+        groups: [
+          { subtitle: '오크', names: [] },
+          { subtitle: '고블린', names: [] },
+        ],
+      },
+      // 143페이지
+      {
+        groups: [
+          { subtitle: '수인', names: [] },
+          { subtitle: '오우거', names: [] },
+        ],
+      },
     ],
   },
   { id: 'work-info', label: '작품 정보', marker: 'right', markerShift: -0.09, markerSeed: 'monsters', pages: [] },
